@@ -32,7 +32,7 @@ fun ArticleCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isPodcast = article.type == "podcast"
+//    val isPodcast = article.type == "podcast"
 
     Row(
         modifier = modifier
@@ -47,9 +47,9 @@ fun ArticleCard(
         verticalAlignment = Alignment.Top
     ) {
         // Article Image
-        if (article.image.isNotEmpty()) {
+        if (article.imageUrl != null) {
             AsyncImage(
-                model = article.image,
+                model = article.imageUrl,
                 contentDescription = null,
                 modifier = Modifier
                     .size(100.dp)
@@ -73,15 +73,15 @@ fun ArticleCard(
                 .weight(1f)
                 .padding(start = 12.dp)
         ) {
-            // Type Badge
-            if (isPodcast) {
-                Text(
-                    text = "🎙 PODCAST",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-            }
+//            // Type Badge
+//            if (isPodcast) {
+//                Text(
+//                    text = "🎙 PODCAST",
+//                    style = MaterialTheme.typography.labelSmall,
+//                    color = MaterialTheme.colorScheme.primary,
+//                    modifier = Modifier.padding(bottom = 4.dp)
+//                )
+//            }
 
             // Title
             Text(
@@ -104,7 +104,7 @@ fun ArticleCard(
             // Source and Date
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "${article.source} • ${article.publishedAt.take(10)}",
+                text = article.pubDate,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.Gray
             )

@@ -74,7 +74,7 @@ fun ArticleDetailScreen(
                 .padding(innerPadding)
         ) {
             WebViewScreen(
-                url = article.url,
+                url = article.link,
                 modifier = Modifier.fillMaxSize()
             )
         }

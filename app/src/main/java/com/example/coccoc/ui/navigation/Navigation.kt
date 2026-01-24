@@ -55,10 +55,11 @@ fun AppNavHost() {
                 Json.decodeFromString<Article>(decoded)
             } catch (e: Exception) {
                 Article(
-                    id = "",
-                    title = "Error",
-                    description = "Failed to load article: $e",
-                    url = ""
+                    title = "",
+                    link = "",
+                    description = e.toString(),
+                    pubDate = "",
+                    imageUrl = null
                 )
             }
 
