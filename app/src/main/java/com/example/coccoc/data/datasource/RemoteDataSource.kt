@@ -43,9 +43,12 @@ class RemoteDataSource @Inject constructor(
                                 "description" -> {
                                     // Extract image from description HTML
                                     val imgRegex = Regex("img src='([^']+)'")
+                                    val descRegex = Regex("</br>(.*)")
+                                    val descriptionText = descRegex.find(text)?.groupValues?.getOrNull(1)?.trim()?:""
+
                                     imageUrl = imgRegex.find(text)?.groupValues?.getOrNull(1)
                                     currentArticle =
-                                        currentArticle.copy(description = text, imageUrl = imageUrl)
+                                        currentArticle.copy(description = descriptionText, imageUrl = imageUrl)
                                 }
 
                                 "pubDate" -> currentArticle = currentArticle.copy(pubDate = text)
