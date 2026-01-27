@@ -7,8 +7,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.coccoc.domain.model.Article
-import com.example.coccoc.ui.component.ArticleDetailScreen
+import com.example.coccoc.ui.screen.normalarticle.ArticleDetailScreen
 import com.example.coccoc.ui.screen.ArticleListScreen
+import com.example.coccoc.ui.screen.podcastarticle.PodcastDetailScreen
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.URLEncoder
@@ -21,6 +22,14 @@ sealed class NavigationRoute(val route: String) {
             val json = Json.encodeToString(article)
             val encoded = URLEncoder.encode(json, "UTF-8")
             return "article_detail/$encoded"
+        }
+    }
+
+    object PodcastDetail : NavigationRoute("podcast_detail/{article}") {
+        fun createRoute(article: Article): String {
+            val json = Json.encodeToString(article)
+            val encoded = URLEncoder.encode(json, "UTF-8")
+            return "podcast_detail/$encoded"
         }
     }
 }
@@ -36,7 +45,11 @@ fun AppNavHost() {
         composable(NavigationRoute.ArticleList.route) {
             ArticleListScreen(
                 onArticleClick = { article ->
-                    navController.navigate(NavigationRoute.ArticleDetail.createRoute(article))
+                    if (article.type == "podcast") {
+                        navController.navigate(NavigationRoute.PodcastDetail.createRoute(article))
+                    } else {
+                        navController.navigate(NavigationRoute.ArticleDetail.createRoute(article))
+                    }
                 }
             )
         }
@@ -62,9 +75,34 @@ fun AppNavHost() {
                     imageUrl = null
                 )
             }
+            ArticleDetailScreen(article = article)
+        }
 
-            ArticleDetailScreen(
-                article = article,
+        composable(
+            route = NavigationRoute.PodcastDetail.route,
+            arguments = listOf(
+                navArgument("article") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val articleJson = backStackEntry.arguments?.getString("article") ?: ""
+            val article = try {
+                val decoded = URLDecoder.decode(articleJson, "UTF-8")
+                Json.decodeFromString<Article>(decoded)
+            } catch (e: Exception) {
+                Article(
+                    title = "",
+                    link = "",
+                    description = e.toString(),
+                    pubDate = "",
+                    imageUrl = null,
+                    type = "podcast"
+                )
+            }
+
+            PodcastDetailScreen(
+                podcast = article,
                 onBackClick = {
                     navController.popBackStack()
                 }

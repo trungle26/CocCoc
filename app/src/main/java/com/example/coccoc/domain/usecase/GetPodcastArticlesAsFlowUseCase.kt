@@ -5,8 +5,8 @@ import com.example.coccoc.domain.repository.IArticleRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
-class GetArticlesAsFlowUseCase @Inject constructor(
+class GetPodcastArticlesAsFlowUseCase @Inject constructor(
     private val repository: IArticleRepository
 ) {
-    operator fun invoke(): Flow<Result<List<Article>>> = repository.getArticles()
+    operator fun invoke(): Flow<Result<List<Article>>> = repository.getPodcastArticles()
 }

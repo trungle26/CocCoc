@@ -15,7 +15,7 @@ class ArticleRepository @Inject constructor(
     private val remoteDataSource: RemoteDataSource,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : IArticleRepository {
-    override fun getArticles(): Flow<Result<List<Article>>> = flow {
+    override fun getNormalArticles(): Flow<Result<List<Article>>> = flow {
         try {
             Timber.d("getArticles")
             val articles = withContext(ioDispatcher) {
@@ -24,6 +24,19 @@ class ArticleRepository @Inject constructor(
             emit(Result.success(articles))
         } catch (e: Exception) {
             Timber.d("getArticles exception: $e")
+            emit(Result.failure(e))
+        }
+    }
+
+    override fun getPodcastArticles(): Flow<Result<List<Article>>> = flow {
+        try {
+            Timber.d("getPodcastArticles")
+            val podcasts = withContext(ioDispatcher) {
+                remoteDataSource.fetchPodcastArticles()
+            }
+            emit(Result.success(podcasts))
+        } catch (e: Exception) {
+            Timber.d("getPodcastArticles exception: $e")
             emit(Result.failure(e))
         }
     }

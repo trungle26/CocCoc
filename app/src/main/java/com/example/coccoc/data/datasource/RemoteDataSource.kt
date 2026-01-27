@@ -65,4 +65,77 @@ class RemoteDataSource @Inject constructor(
         }
         return articles
     }
+
+    fun fetchPodcastArticles(): List<Article> {
+        val url = URL("https://vnexpress.net/rss/podcast/vnexpress-hom-nay.rss")
+        val connection = url.openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 5000
+        connection.readTimeout = 5000
+
+        val podcasts = mutableListOf<Article>()
+        connection.inputStream.use { inputStream ->
+            val parser = Xml.newPullParser()
+            parser.setInput(inputStream, null)
+            var eventType = parser.eventType
+            var currentPodcast: Article? = null
+            var text = ""
+            var imageUrl: String? = null
+            var audioUrl: String? = null
+            var duration: String? = null
+
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                val tagName = parser.name
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        if (tagName == "item") {
+                            currentPodcast = Article(
+                                title = "",
+                                link = "",
+                                description = "",
+                                pubDate = "",
+                                imageUrl = null,
+                                audioUrl = null,
+                                duration = null,
+                                type = "podcast"
+                            )
+                            imageUrl = null
+                            audioUrl = null
+                            duration = null
+                        }
+                        if (tagName == "enclosure") {
+                            audioUrl = parser.getAttributeValue(null, "url")
+                        }
+                        if (tagName == "itunes:image") {
+                            imageUrl = parser.getAttributeValue(null, "href")
+                        }
+                    }
+                    XmlPullParser.TEXT -> text = parser.text
+                    XmlPullParser.END_TAG -> {
+                        if (currentPodcast != null) {
+                            when (tagName) {
+                                "title" -> currentPodcast = currentPodcast.copy(title = text)
+                                "link" -> currentPodcast = currentPodcast.copy(link = text)
+                                "description" -> currentPodcast = currentPodcast.copy(description = text)
+                                "pubDate" -> currentPodcast = currentPodcast.copy(pubDate = text)
+                                "itunes:duration" -> duration = text
+                                "item" -> {
+                                    podcasts.add(
+                                        currentPodcast.copy(
+                                            imageUrl = imageUrl,
+                                            audioUrl = audioUrl,
+                                            duration = duration
+                                        )
+                                    )
+                                    currentPodcast = null
+                                }
+                            }
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+        }
+        return podcasts
+    }
 }

@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.coccoc.domain.model.Article
 import com.example.coccoc.ui.component.ArticleCard
-import com.example.coccoc.ui.viewmodel.ArticleListViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
