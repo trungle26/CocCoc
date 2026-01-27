@@ -8,9 +8,7 @@ plugins {
 
 android {
     namespace = "com.example.coccoc"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.coccoc"
@@ -72,4 +70,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.timber)
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 }

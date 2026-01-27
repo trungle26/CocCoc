@@ -75,7 +75,7 @@ fun AppNavHost() {
                     imageUrl = null
                 )
             }
-            ArticleDetailScreen(article = article)
+            ArticleDetailScreen(article = article, onBackClick = {navController.popBackStack()})
         }
 
         composable(

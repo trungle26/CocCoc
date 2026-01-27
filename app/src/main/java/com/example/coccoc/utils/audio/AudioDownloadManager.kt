@@ -34,6 +34,10 @@ class AudioDownloadManager(private val context: Context) {
         audioFile?.delete()
     }
 
+    fun getFileNameFromUrl(url: String): String {
+        return extractAudioFileName(url)
+    }
+
     companion object {
         fun extractAudioFileName(url: String): String {
             return url.substringAfterLast("/")
