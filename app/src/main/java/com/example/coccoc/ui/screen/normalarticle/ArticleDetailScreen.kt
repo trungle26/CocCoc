@@ -1,8 +1,11 @@
 package com.example.coccoc.ui.screen.normalarticle
 
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -26,12 +29,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.coccoc.domain.model.Article
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun ArticleDetailScreen(
     modifier: Modifier = Modifier,
@@ -42,6 +50,11 @@ fun ArticleDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val webViewReference = remember { mutableListOf<WebView>() }
+    val context = LocalContext.current
+
+    val notificationPermissionState = if (android.os.Build.VERSION.SDK_INT >= 33) {
+        rememberPermissionState(android.Manifest.permission.POST_NOTIFICATIONS)
+    } else null
 
     LaunchedEffect(article.link) {
         viewModel.loadArticle(article)
@@ -84,7 +97,16 @@ fun ArticleDetailScreen(
                 },
                 actions = {
                     IconButton(
-                        onClick = { viewModel.extractAndDownloadAudio() },
+                        onClick = {
+                            if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                                notificationPermissionState?.status?.isGranted == false) {
+                                notificationPermissionState.launchPermissionRequest()
+                            }
+
+                            viewModel.extractAndDownloadAudio { path ->
+                                Toast.makeText(context, path, Toast.LENGTH_LONG).show()
+                            }
+                        },
                         enabled = !uiState.isDownloadingAudio
                     ) {
                         if (uiState.isDownloadingAudio) {
@@ -123,35 +145,16 @@ fun ArticleDetailScreen(
                 factory = { context ->
                     WebView(context).apply {
                         webViewClient = object : WebViewClient() {
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                super.onPageFinished(view, url)
-                                // Inject JavaScript to extract audio URLs
-                                view?.evaluateJavascript(
-                                    """
-                                    (function() {
-                                        var audios = [];
-                                        // Get all audio elements
-                                        var audioElements = document.querySelectorAll('audio');
-                                        audioElements.forEach(function(audio) {
-                                            var src = audio.src || audio.querySelector('source')?.src;
-                                            if (src) audios.push(src);
-                                        });
-                                        // Get all audio links
-                                        var links = document.querySelectorAll('a[href*=".mp3"], a[href*=".m4a"], a[href*=".wav"]');
-                                        links.forEach(function(link) {
-                                            if (link.href) audios.push(link.href);
-                                        });
-                                        return JSON.stringify(audios);
-                                    })();
-                                    """.trimIndent()
-                                ) { result ->
-                                    try {
-                                        val cleanResult = result?.removeSurrounding("\"") ?: "[]"
-                                        viewModel.setExtractedAudioUrls(cleanResult)
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
+                            override fun shouldInterceptRequest(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): WebResourceResponse? {
+                                request?.url?.toString()?.let { urlString ->
+                                    if (isAudioUrl(urlString)) {
+                                        viewModel.addDetectedAudioUrl(urlString)
                                     }
                                 }
+                                return super.shouldInterceptRequest(view, request)
                             }
                         }
                         settings.apply {
@@ -169,4 +172,13 @@ fun ArticleDetailScreen(
             )
         }
     }
+}
+
+private fun isAudioUrl(url: String): Boolean {
+    val lowerUrl = url.lowercase(Locale.ROOT)
+    return lowerUrl.endsWith(".mp3") ||
+            lowerUrl.endsWith(".m4a") ||
+            lowerUrl.endsWith(".wav") ||
+            lowerUrl.endsWith(".aac") ||
+            lowerUrl.endsWith(".ogg")
 }

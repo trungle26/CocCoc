@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.coccoc.domain.model.Article
 import com.example.coccoc.domain.usecase.GetPodcastDetailUseCase
 import com.example.coccoc.service.AudioPlaybackService
+import com.example.coccoc.utils.audio.AudioDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +28,7 @@ class PodcastDetailViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    private val audioDownloadManager = AudioDownloadManager(context)
     private val _uiState = MutableStateFlow(PodcastDetailUiState())
     val uiState: StateFlow<PodcastDetailUiState> = _uiState.asStateFlow()
 
@@ -126,6 +128,55 @@ class PodcastDetailViewModel @Inject constructor(
 
     fun seekTo(position: Long) {
         audioPlaybackService?.seekTo(position)
+    }
+
+    fun downloadPodcast(showToast: (String) -> Unit) {
+        if (_uiState.value.isDownloading) return
+
+        val podcast = _uiState.value.podcast
+        val audioUrl = podcast?.audioUrl
+
+        if (audioUrl.isNullOrEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                message = "No audio URL available"
+            )
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isDownloading = true)
+        viewModelScope.launch {
+            try {
+                val fileName = audioDownloadManager.getFileNameFromUrl(audioUrl)
+
+                val result = audioDownloadManager.downloadAudio(audioUrl, fileName)
+                if (result == -1L) {
+                    _uiState.value = _uiState.value.copy(
+                        isDownloading = false,
+                        message = "Download failed"
+                    )
+                    Timber.e("Failed to download podcast")
+                } else {
+                    // Get download directory path
+                    val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(
+                        android.os.Environment.DIRECTORY_DOWNLOADS
+                    ).absolutePath
+                    val fullPath = "$downloadDir/$fileName"
+
+                    showToast("Downloaded to: $fullPath")
+                    _uiState.value = _uiState.value.copy(
+                        isDownloading = false,
+                        message = "Podcast downloaded successfully"
+                    )
+                    Timber.d("Podcast downloaded: $fullPath")
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isDownloading = false,
+                    message = "Error: ${e.message}"
+                )
+                Timber.e(e, "Error downloading podcast")
+            }
+        }
     }
 
     private fun bindToService() {

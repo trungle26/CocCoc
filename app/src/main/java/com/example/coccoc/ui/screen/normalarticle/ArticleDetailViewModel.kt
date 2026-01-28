@@ -13,6 +13,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -59,12 +60,41 @@ class ArticleDetailViewModel @Inject constructor(
         }
     }
 
+    fun addDetectedAudioUrl(url: String) {
+        _uiState.update { currentState ->
+            val currentJson = currentState.extractedAudioUrls
+            val currentList = try {
+                if (currentJson == "[]" || currentJson.isEmpty()) {
+                    mutableListOf()
+                } else {
+                    currentJson
+                        .removeSurrounding("[", "]")
+                        .split(",")
+                        .map { it.trim().removeSurrounding("\"") }
+                        .filter { it.isNotEmpty() }
+                        .toMutableList()
+                }
+            } catch (e: Exception) {
+                mutableListOf()
+            }
+
+            if (!currentList.contains(url)) {
+                currentList.add(url)
+                val newJson = currentList.joinToString(separator = ",", prefix = "[", postfix = "]") { "\"$it\"" }
+                Timber.d("Network audio detected: $url")
+                currentState.copy(extractedAudioUrls = newJson)
+            } else {
+                currentState
+            }
+        }
+    }
+
     fun setExtractedAudioUrls(audioUrlsJson: String) {
         _uiState.value = _uiState.value.copy(extractedAudioUrls = audioUrlsJson)
         Timber.d("Audio URLs extracted: $audioUrlsJson")
     }
 
-    fun extractAndDownloadAudio() {
+    fun extractAndDownloadAudio(showToast: (String) -> Unit) {
         if (_uiState.value.isDownloadingAudio) return
 
         _uiState.value = _uiState.value.copy(isDownloadingAudio = true)
@@ -109,6 +139,12 @@ class ArticleDetailViewModel @Inject constructor(
                     )
                     Timber.e("Failed to download audio")
                 }else{
+                    val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(
+                        android.os.Environment.DIRECTORY_DOWNLOADS
+                    ).absolutePath
+                    val fullPath = "$downloadDir/$fileName"
+
+                    showToast("Downloaded to: $fullPath")
                     _uiState.value = _uiState.value.copy(
                         isDownloadingAudio = false,
                         message = "Audio downloading: $fileName"

@@ -71,4 +71,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.timber)
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
 }

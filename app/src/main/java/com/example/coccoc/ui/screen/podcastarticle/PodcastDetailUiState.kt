@@ -8,5 +8,7 @@ data class PodcastDetailUiState(
     val error: String? = null,
     val isPlaying: Boolean = false,
     val currentPosition: Long = 0L,
-    val duration: Long = 0L
+    val duration: Long = 0L,
+    val isDownloading: Boolean = false,
+    val message: String? = null
 )

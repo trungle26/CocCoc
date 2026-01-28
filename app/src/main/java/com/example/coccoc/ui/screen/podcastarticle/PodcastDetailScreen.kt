@@ -1,5 +1,6 @@
 package com.example.coccoc.ui.screen.podcastarticle
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,29 +18,38 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.coccoc.domain.model.Article
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import timber.log.Timber
 
 private fun formatTime(milliseconds: Long): String {
@@ -49,7 +59,7 @@ private fun formatTime(milliseconds: Long): String {
     return String.format("%d:%02d", minutes, seconds)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun PodcastDetailScreen(
     podcast: Article,
@@ -58,9 +68,22 @@ fun PodcastDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Request notification permission for Android 13+
+    val notificationPermissionState = if (android.os.Build.VERSION.SDK_INT >= 33) {
+        rememberPermissionState(android.Manifest.permission.POST_NOTIFICATIONS)
+    } else null
 
     LaunchedEffect(podcast.audioUrl) {
         viewModel.loadPodcast(podcast)
+    }
+
+    LaunchedEffect(uiState.message) {
+        uiState.message?.let {
+            snackbarHostState.showSnackbar(it)
+        }
     }
 
     Scaffold(
@@ -81,7 +104,37 @@ fun PodcastDetailScreen(
                     }
                 }
             )
-        }
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    // Request permission if needed (Android 13+)
+                    if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                        notificationPermissionState?.status?.isGranted == false) {
+                        notificationPermissionState.launchPermissionRequest()
+                    }
+
+                    viewModel.downloadPodcast { path ->
+                        Toast.makeText(context, path, Toast.LENGTH_LONG).show()
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                if (uiState.isDownloading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Download Podcast",
+                        tint = Color.White
+                    )
+                }
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Box(
             modifier = modifier
@@ -156,7 +209,6 @@ fun PodcastDetailScreen(
 
                     // Audio Player
                     if (!uiState.podcast?.audioUrl.isNullOrEmpty()) {
-                        Timber.d("audio url: ${uiState.podcast?.audioUrl}")
                         PodcastAudioPlayer(
                             title = uiState.podcast?.title ?: "Play Podcast",
                             isPlaying = uiState.isPlaying,
