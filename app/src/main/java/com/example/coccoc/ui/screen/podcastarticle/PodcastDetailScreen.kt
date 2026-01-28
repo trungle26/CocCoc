@@ -28,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -300,15 +301,15 @@ fun PodcastAudioPlayer(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Progress bar
-        LinearProgressIndicator(
-            progress = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()) else 0f,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(4.dp)
+        // Seekable progress slider
+        Slider(
+            value = if (duration > 0) currentPosition.toFloat() else 0f,
+            onValueChange = { newPosition ->
+                onSeekTo(newPosition.toLong())
+            },
+            valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
+            modifier = Modifier.fillMaxWidth()
         )
-
-        Spacer(modifier = Modifier.height(8.dp))
 
         // Time display
         Row(

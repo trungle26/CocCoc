@@ -1,6 +1,7 @@
 package com.example.coccoc.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -12,6 +13,7 @@ import com.example.coccoc.ui.screen.ArticleListScreen
 import com.example.coccoc.ui.screen.podcastarticle.PodcastDetailScreen
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import timber.log.Timber
 import java.net.URLEncoder
 import java.net.URLDecoder
 
@@ -35,8 +37,27 @@ sealed class NavigationRoute(val route: String) {
 }
 
 @Composable
-fun AppNavHost() {
+fun AppNavHost(
+    startDestination: String = NavigationRoute.ArticleList.route,
+    onNavigationHandled: () -> Unit = {}
+) {
     val navController = rememberNavController()
+
+    // Handle deep link navigation when activity receives new intent
+    LaunchedEffect(startDestination) {
+        if (startDestination != NavigationRoute.ArticleList.route) {
+            Timber.d("Navigating to deep link: $startDestination")
+            // Check if we're already on this destination
+            val currentRoute = navController.currentBackStackEntry?.destination?.route
+            if (currentRoute != startDestination) {
+                navController.navigate(startDestination) {
+                    // Don't create multiple instances of the same destination
+                    launchSingleTop = true
+                }
+            }
+            onNavigationHandled()
+        }
+    }
 
     NavHost(
         navController = navController,

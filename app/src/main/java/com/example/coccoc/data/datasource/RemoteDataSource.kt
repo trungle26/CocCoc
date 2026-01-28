@@ -106,8 +106,15 @@ class RemoteDataSource @Inject constructor(
                         if (tagName == "enclosure") {
                             audioUrl = parser.getAttributeValue(null, "url")
                         }
-                        if (tagName == "itunes:image") {
+                        // Handle itunes:image tag - check both with and without namespace
+                        if (tagName == "image" && parser.namespace == "http://www.itunes.com/dtds/podcast-1.0.dtd") {
                             imageUrl = parser.getAttributeValue(null, "href")
+                        } else if (tagName?.contains("image") == true) {
+                            // Fallback: check if tag name contains "image" (handles itunes:image)
+                            val href = parser.getAttributeValue(null, "href")
+                            if (href != null) {
+                                imageUrl = href
+                            }
                         }
                     }
                     XmlPullParser.TEXT -> text = parser.text

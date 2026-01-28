@@ -32,20 +32,19 @@ class PodcastDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PodcastDetailUiState())
     val uiState: StateFlow<PodcastDetailUiState> = _uiState.asStateFlow()
 
-    private var audioPlaybackService: AudioPlaybackService? = null
+    private var serviceBinder: AudioPlaybackService.AudioPlaybackBinder? = null
     private var isBound = false
     private var pendingPodcast: Article? = null
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as AudioPlaybackService.AudioPlaybackBinder
-            audioPlaybackService = binder.getService()
+            serviceBinder = binder
             isBound = true
             Timber.d("Service connected")
 
-            // Subscribe to service playback state
             viewModelScope.launch {
-                audioPlaybackService?.playbackState?.collect { state ->
+                binder.getService().playbackState.collect { state ->
                     _uiState.value = _uiState.value.copy(
                         isPlaying = state.isPlaying,
                         currentPosition = state.currentPosition,
@@ -54,70 +53,84 @@ class PodcastDetailViewModel @Inject constructor(
                 }
             }
 
-            // Play pending podcast if any
             pendingPodcast?.let { podcast ->
-                audioPlaybackService?.prepareAndPlay(
-                    audioUrl = podcast.audioUrl ?: "",
-                    title = podcast.title
-                )
-                Timber.d("Playing pending podcast: ${podcast.title}")
+                val currentAudioUrl = binder.getService().playbackState.value.audioUrl
+
+                if (currentAudioUrl != podcast.audioUrl) {
+                    Timber.d("Service connected, playing pending podcast: ${podcast.title}")
+                    binder.getService().prepareAndPlay(
+                        audioUrl = podcast.audioUrl ?: "",
+                        title = podcast.title,
+                        article = podcast
+                    )
+                } else {
+                    Timber.d("Service already playing this podcast, not reloading")
+                }
+                pendingPodcast = null
             }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             isBound = false
-            audioPlaybackService = null
+            serviceBinder = null
             Timber.d("Service disconnected")
         }
     }
 
     fun loadPodcast(podcast: Article) {
-        Timber.d("podcast data: ${podcast}")
+        Timber.d("loadPodcast called for: ${podcast.title}")
+
+        // Check if this podcast is already loaded
+        if(_uiState.value.podcast?.audioUrl == podcast.audioUrl) {
+            Timber.d("Podcast already loaded, skipping reload")
+            return
+        }
+
         _uiState.value = _uiState.value.copy(isLoading = true)
         viewModelScope.launch {
-            try {
-                val result = getPodcastDetailUseCase.execute(podcast)
-                result.onSuccess { loadedPodcast ->
-                    _uiState.value = _uiState.value.copy(
-                        podcast = loadedPodcast,
-                        isLoading = false,
-                        error = null
-                    )
-                    Timber.d("Podcast loaded: ${loadedPodcast.title}")
+            val result = getPodcastDetailUseCase.execute(podcast)
+            result.onSuccess { loadedPodcast ->
+                _uiState.value = _uiState.value.copy(
+                    podcast = loadedPodcast,
+                    isLoading = false,
+                    error = null
+                )
+                Timber.d("Podcast loaded: ${loadedPodcast.title}")
 
-                    // Store the podcast to play after service connection
-                    pendingPodcast = loadedPodcast
+                pendingPodcast = loadedPodcast
 
-                    // Bind to service if not already bound
-                    if (!isBound) {
-                        bindToService()
-                    } else {
-                        // If already bound, play immediately
-                        audioPlaybackService?.prepareAndPlay(
+                if (!isBound) {
+                    Timber.d("Service not bound, binding to service")
+                    bindToService()
+                } else {
+                    // Check if service is already playing this podcast
+                    val service = serviceBinder?.getService()
+                    val currentAudioUrl = service?.playbackState?.value?.audioUrl
+
+                    if (currentAudioUrl != loadedPodcast.audioUrl) {
+                        Timber.d("Service bound but different podcast, playing new podcast")
+                        service?.prepareAndPlay(
                             audioUrl = loadedPodcast.audioUrl ?: "",
-                            title = loadedPodcast.title
+                            title = loadedPodcast.title,
+                            article = loadedPodcast
                         )
+                    } else {
+                        Timber.d("Service already playing this podcast, not reloading")
                     }
                 }
-                result.onFailure { exception ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = exception.message ?: "Unknown error"
-                    )
-                    Timber.e(exception, "Failed to load podcast")
-                }
-            } catch (e: Exception) {
+            }
+            result.onFailure { exception ->
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = e.message ?: "Unknown error"
+                    error = exception.message ?: "Unknown error"
                 )
-                Timber.e(e, "Error loading podcast")
+                Timber.e(exception, "Failed to load podcast")
             }
         }
     }
 
     fun togglePlayPause() {
-        audioPlaybackService?.apply {
+        serviceBinder?.getService()?.apply {
             if (isPlaying()) {
                 pause()
             } else {
@@ -127,7 +140,7 @@ class PodcastDetailViewModel @Inject constructor(
     }
 
     fun seekTo(position: Long) {
-        audioPlaybackService?.seekTo(position)
+        serviceBinder?.getService()?.seekTo(position)
     }
 
     fun downloadPodcast(showToast: (String) -> Unit) {
@@ -181,9 +194,7 @@ class PodcastDetailViewModel @Inject constructor(
 
     private fun bindToService() {
         val intent = Intent(context, AudioPlaybackService::class.java)
-        // Start the service first to ensure it keeps running
         context.startService(intent)
-        // Then bind to it
         context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         Timber.d("Service start and bind initiated")
     }

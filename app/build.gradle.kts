@@ -55,6 +55,8 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
     implementation(libs.media3.session)
+    implementation("androidx.media3:media3-common:1.2.0")
+    implementation("androidx.media:media:1.7.0")
     implementation(libs.glide)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.coil.compose)
