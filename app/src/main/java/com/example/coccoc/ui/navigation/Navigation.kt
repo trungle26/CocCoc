@@ -2,6 +2,7 @@ package com.example.coccoc.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -38,6 +39,7 @@ sealed class NavigationRoute(val route: String) {
 
 @Composable
 fun AppNavHost(
+    modifier : Modifier = Modifier,
     startDestination: String = NavigationRoute.ArticleList.route,
     onNavigationHandled: () -> Unit = {}
 ) {
@@ -60,6 +62,7 @@ fun AppNavHost(
     }
 
     NavHost(
+        modifier = modifier,
         navController = navController,
         startDestination = NavigationRoute.ArticleList.route
     ) {

@@ -1,7 +1,6 @@
 package com.example.coccoc.ui.screen.normalarticle
 
 import android.content.Context
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.coccoc.domain.model.Article
@@ -27,33 +26,27 @@ class ArticleDetailViewModel @Inject constructor(
     private val audioDownloadManager = AudioDownloadManager(context)
     private val contentSummarizer = ContentSummarizer()
 
-    private val _uiState = MutableStateFlow(ArticleDetailUiState())
+    private val _uiState = MutableStateFlow<ArticleDetailUiState>(ArticleDetailUiState.Loading)
     val uiState: StateFlow<ArticleDetailUiState> = _uiState.asStateFlow()
 
     fun loadArticle(article: Article) {
-        _uiState.value = _uiState.value.copy(isLoading = true)
+        _uiState.value = ArticleDetailUiState.Loading
         viewModelScope.launch {
             try {
                 val result = getArticleDetailUseCase.execute(article)
                 result.onSuccess { loadedArticle ->
-                    _uiState.value = _uiState.value.copy(
-                        article = loadedArticle,
-                        isLoading = false,
-                        error = null
-                    )
+                    _uiState.value = ArticleDetailUiState.Success(article = loadedArticle)
                     Timber.d("Article loaded: ${loadedArticle.title}")
                 }
                 result.onFailure { exception ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = exception.message ?: "Unknown error"
+                    _uiState.value = ArticleDetailUiState.Error(
+                        errorMessage = exception.message ?: "Unknown error"
                     )
                     Timber.e(exception, "Failed to load article")
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message ?: "Unknown error"
+                _uiState.value = ArticleDetailUiState.Error(
+                    errorMessage = e.message ?: "Unknown error"
                 )
                 Timber.e(e, "Error loading article")
             }
@@ -62,139 +55,175 @@ class ArticleDetailViewModel @Inject constructor(
 
     fun addDetectedAudioUrl(url: String) {
         _uiState.update { currentState ->
-            val currentJson = currentState.extractedAudioUrls
-            val currentList = try {
-                if (currentJson == "[]" || currentJson.isEmpty()) {
-                    mutableListOf()
-                } else {
-                    currentJson
-                        .removeSurrounding("[", "]")
-                        .split(",")
-                        .map { it.trim().removeSurrounding("\"") }
-                        .filter { it.isNotEmpty() }
-                        .toMutableList()
-                }
-            } catch (e: Exception) {
-                mutableListOf()
-            }
+            when (currentState) {
+                is ArticleDetailUiState.Success -> {
+                    val currentList = currentState.audioState.audioUrlsList.toMutableList()
 
-            if (!currentList.contains(url)) {
-                currentList.add(url)
-                val newJson = currentList.joinToString(separator = ",", prefix = "[", postfix = "]") { "\"$it\"" }
-                Timber.d("Network audio detected: $url")
-                currentState.copy(extractedAudioUrls = newJson)
-            } else {
-                currentState
+                    if (currentList.none { it.url == url }) {
+                        currentList.add(
+                            AudioFileInfo(
+                                url = url,
+                                fileName = audioDownloadManager.getFileNameFromUrl(url)
+                            )
+                        )
+                        Timber.d("Network audio detected: $url")
+
+                        val isFirstDetection = !currentState.audioState.hasDetectedAudio
+
+                        currentState.copy(
+                            audioState = currentState.audioState.copy(
+                                audioUrlsList = currentList,
+                                hasDetectedAudio = true
+                            ),
+                            message = if (isFirstDetection) "Audio detected! (${currentList.size} file(s))"
+                                     else if (currentList.size > 1) "${currentList.size} audio files detected"
+                                     else null
+                        )
+                    } else {
+                        currentState
+                    }
+                }
+                else -> currentState
             }
         }
     }
 
-    fun setExtractedAudioUrls(audioUrlsJson: String) {
-        _uiState.value = _uiState.value.copy(extractedAudioUrls = audioUrlsJson)
-        Timber.d("Audio URLs extracted: $audioUrlsJson")
+    fun showDownloadDialog() {
+        _uiState.update { currentState ->
+            when (currentState) {
+                is ArticleDetailUiState.Success -> {
+                    if (currentState.audioState.audioUrlsList.isEmpty()) {
+                        currentState.copy(message = "No audio found in article")
+                    } else {
+                        currentState.copy(
+                            audioState = currentState.audioState.copy(showDownloadDialog = true)
+                        )
+                    }
+                }
+                else -> currentState
+            }
+        }
     }
 
-    fun extractAndDownloadAudio(showToast: (String) -> Unit) {
-        if (_uiState.value.isDownloadingAudio) return
+    fun hideDownloadDialog() {
+        _uiState.update { currentState ->
+            when (currentState) {
+                is ArticleDetailUiState.Success -> {
+                    currentState.copy(
+                        audioState = currentState.audioState.copy(showDownloadDialog = false)
+                    )
+                }
+                else -> currentState
+            }
+        }
+    }
 
-        _uiState.value = _uiState.value.copy(isDownloadingAudio = true)
+    fun downloadSelectedAudio(audioFileInfo: AudioFileInfo) {
+        hideDownloadDialog()
+
+        val currentState = _uiState.value
+        if (currentState !is ArticleDetailUiState.Success) return
+        if (currentState.audioState.isDownloading) return
+
+        _uiState.value = currentState.copy(
+            audioState = currentState.audioState.copy(isDownloading = true)
+        )
+
         viewModelScope.launch {
             try {
-                val audioUrlsJson = _uiState.value.extractedAudioUrls
-                if (audioUrlsJson == "[]" || audioUrlsJson.isEmpty()) {
-                    _uiState.value = _uiState.value.copy(
-                        isDownloadingAudio = false,
-                        message = "No audio found in article"
-                    )
-                    return@launch
-                }
-
-                val audioUrls = try {
-                    audioUrlsJson
-                        .removeSurrounding("[", "]")
-                        .split(",")
-                        .map { it.trim().removeSurrounding("\"") }
-                        .filter { it.isNotEmpty() }
-                } catch (e: Exception) {
-                    Timber.e(e, "Error parsing audio URLs")
-                    emptyList()
-                }
-
-                if (audioUrls.isEmpty()) {
-                    _uiState.value = _uiState.value.copy(
-                        isDownloadingAudio = false,
-                        message = "No valid audio URLs found"
-                    )
-                    return@launch
-                }
-
-                val audioUrl = audioUrls.first()
-                val fileName = audioDownloadManager.getFileNameFromUrl(audioUrl)
-
-                val result = audioDownloadManager.downloadAudio(audioUrl, fileName)
-                if(result == -1L){
-                    _uiState.value = _uiState.value.copy(
-                        isDownloadingAudio = false,
-                        message = "Download failed}"
-                    )
+                val result = audioDownloadManager.downloadAudio(audioFileInfo.url, audioFileInfo.fileName)
+                if (result == -1L) {
+                    _uiState.update { state ->
+                        if (state is ArticleDetailUiState.Success) {
+                            state.copy(
+                                audioState = state.audioState.copy(isDownloading = false),
+                                message = "Download failed"
+                            )
+                        } else state
+                    }
                     Timber.e("Failed to download audio")
-                }else{
-                    val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(
-                        android.os.Environment.DIRECTORY_DOWNLOADS
-                    ).absolutePath
-                    val fullPath = "$downloadDir/$fileName"
-
-                    showToast("Downloaded to: $fullPath")
-                    _uiState.value = _uiState.value.copy(
-                        isDownloadingAudio = false,
-                        message = "Audio downloading: $fileName"
-                    )
-                    Timber.d("Audio downloading: $fileName")
+                } else {
+                    _uiState.update { state ->
+                        if (state is ArticleDetailUiState.Success) {
+                            state.copy(
+                                audioState = state.audioState.copy(isDownloading = false),
+                                message = "Download started: ${audioFileInfo.fileName}"
+                            )
+                        } else state
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isDownloadingAudio = false,
-                    message = "Error: ${e.message}"
-                )
+                _uiState.update { state ->
+                    if (state is ArticleDetailUiState.Success) {
+                        state.copy(
+                            audioState = state.audioState.copy(isDownloading = false),
+                            message = "Error: ${e.message}"
+                        )
+                    } else state
+                }
                 Timber.e(e, "Error downloading audio")
             }
         }
     }
 
     fun summarizeContent() {
-        if (_uiState.value.isSummarizing) return
+        val currentState = _uiState.value
+        if (currentState !is ArticleDetailUiState.Success) return
+        if (currentState.summarizationState.isSummarizing) return
 
-        _uiState.value = _uiState.value.copy(isSummarizing = true)
+        _uiState.value = currentState.copy(
+            summarizationState = currentState.summarizationState.copy(isSummarizing = true)
+        )
+
         viewModelScope.launch {
             try {
-                val article = _uiState.value.article
-                if (article == null || article.description.isEmpty()) {
-                    _uiState.value = _uiState.value.copy(
-                        isSummarizing = false,
-                        message = "No content to summarize"
-                    )
+                val article = currentState.article
+                if (article.description.isEmpty()) {
+                    _uiState.update { state ->
+                        if (state is ArticleDetailUiState.Success) {
+                            state.copy(
+                                summarizationState = state.summarizationState.copy(isSummarizing = false),
+                                message = "No content to summarize"
+                            )
+                        } else state
+                    }
                     return@launch
                 }
 
                 val summary = contentSummarizer.summarizeHtml(article.description)
-                _uiState.value = _uiState.value.copy(
-                    summary = summary,
-                    isSummarizing = false,
-                    message = "Summary generated"
-                )
+                _uiState.update { state ->
+                    if (state is ArticleDetailUiState.Success) {
+                        state.copy(
+                            summarizationState = state.summarizationState.copy(
+                                summary = summary,
+                                isSummarizing = false
+                            ),
+                            message = "Summary generated"
+                        )
+                    } else state
+                }
                 Timber.d("Content summarized: $summary")
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isSummarizing = false,
-                    message = "Error: ${e.message}"
-                )
+                _uiState.update { state ->
+                    if (state is ArticleDetailUiState.Success) {
+                        state.copy(
+                            summarizationState = state.summarizationState.copy(isSummarizing = false),
+                            message = "Error: ${e.message}"
+                        )
+                    } else state
+                }
                 Timber.e(e, "Error summarizing content")
             }
         }
     }
 
-    fun resetSummary() {
-        _uiState.value = _uiState.value.copy(summary = "")
+    fun clearMessage() {
+        _uiState.update { currentState ->
+            when (currentState) {
+                is ArticleDetailUiState.Success -> currentState.copy(message = null)
+                else -> currentState
+            }
+        }
     }
 
     override fun onCleared() {

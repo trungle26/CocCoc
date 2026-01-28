@@ -1,6 +1,5 @@
 package com.example.coccoc.ui.screen.podcastarticle
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,13 +24,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,10 +41,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.media3.common.util.UnstableApi
 import coil.compose.AsyncImage
 import com.example.coccoc.domain.model.Article
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -60,16 +59,16 @@ private fun formatTime(milliseconds: Long): String {
     return String.format("%d:%02d", minutes, seconds)
 }
 
+@androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun PodcastDetailScreen(
+    modifier: Modifier = Modifier,
     podcast: Article,
     onBackClick: () -> Unit,
-    viewModel: PodcastDetailViewModel = hiltViewModel(),
-    modifier: Modifier = Modifier
+    viewModel: PodcastDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Request notification permission for Android 13+
@@ -81,9 +80,14 @@ fun PodcastDetailScreen(
         viewModel.loadPodcast(podcast)
     }
 
-    LaunchedEffect(uiState.message) {
-        uiState.message?.let {
+    val currentMessage = if (uiState is PodcastDetailUiState.Success) {
+        (uiState as PodcastDetailUiState.Success).message
+    } else null
+
+    LaunchedEffect(currentMessage) {
+        currentMessage?.let {
             snackbarHostState.showSnackbar(it)
+            viewModel.clearMessage()
         }
     }
 
@@ -107,139 +111,169 @@ fun PodcastDetailScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    // Request permission if needed (Android 13+)
-                    if (android.os.Build.VERSION.SDK_INT >= 33 &&
-                        notificationPermissionState?.status?.isGranted == false) {
-                        notificationPermissionState.launchPermissionRequest()
+            if (uiState is PodcastDetailUiState.Success) {
+                FloatingActionButton(
+                    onClick = {
+                        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                            notificationPermissionState?.status?.isGranted == false) {
+                            notificationPermissionState.launchPermissionRequest()
+                        }
+                        viewModel.downloadPodcast()
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    if ((uiState as PodcastDetailUiState.Success).isDownloading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color.White
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Download Podcast",
+                            tint = Color.White
+                        )
                     }
-
-                    viewModel.downloadPodcast { path ->
-                        Toast.makeText(context, path, Toast.LENGTH_LONG).show()
-                    }
-                },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                if (uiState.isDownloading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Color.White
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Download Podcast",
-                        tint = Color.White
-                    )
                 }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else if (uiState.error != null) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Error: ${uiState.error}",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            } else {
-                Column(
+        when (val state = uiState) {
+            is PodcastDetailUiState.Loading -> {
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(innerPadding),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Podcast Image
-                    if (!uiState.podcast?.imageUrl.isNullOrEmpty()) {
-                        AsyncImage(
-                            model = uiState.podcast?.imageUrl,
-                            contentDescription = "Podcast Image",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp)
-                                .padding(bottom = 16.dp),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
+                    CircularProgressIndicator()
+                }
+            }
 
-                    // Title
-                    Text(
-                        text = uiState.podcast?.title ?: podcast.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    // Publication Date
-                    if (!uiState.podcast?.pubDate.isNullOrEmpty()) {
+            is PodcastDetailUiState.Error -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(16.dp)
+                    ) {
                         Text(
-                            text = uiState.podcast?.pubDate ?: "",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 16.dp)
+                            text = state.errorMessage,
+                            color = MaterialTheme.colorScheme.error
                         )
-                    }
-
-                    // Duration
-                    if (!uiState.podcast?.duration.isNullOrEmpty()) {
-                        Text(
-                            text = "Duration: ${uiState.podcast?.duration}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Audio Player
-                    if (!uiState.podcast?.audioUrl.isNullOrEmpty()) {
-                        PodcastAudioPlayer(
-                            title = uiState.podcast?.title ?: "Play Podcast",
-                            isPlaying = uiState.isPlaying,
-                            currentPosition = uiState.currentPosition,
-                            duration = uiState.duration,
-                            onPlayPauseClick = { viewModel.togglePlayPause() },
-                            onSeekTo = { position -> viewModel.seekTo(position) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Description
-                    if (!uiState.podcast?.description.isNullOrEmpty()) {
-                        Text(
-                            text = "Description",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier
-                                .align(Alignment.Start)
-                                .padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = uiState.podcast?.description ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        TextButton(onClick = { viewModel.loadPodcast(podcast) }) {
+                            Text("Retry")
+                        }
                     }
                 }
             }
+
+            is PodcastDetailUiState.Success -> {
+                PodcastDetailContent(
+                    modifier = modifier,
+                    state = state,
+                    viewModel = viewModel,
+                    innerPadding = innerPadding
+                )
+            }
+        }
+    }
+}
+
+@androidx.annotation.OptIn(UnstableApi::class)
+@Composable
+private fun PodcastDetailContent(
+    modifier: Modifier,
+    state: PodcastDetailUiState.Success,
+    viewModel: PodcastDetailViewModel,
+    innerPadding: androidx.compose.foundation.layout.PaddingValues
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Podcast Image
+        if (!state.podcast.imageUrl.isNullOrEmpty()) {
+            AsyncImage(
+                model = state.podcast.imageUrl,
+                contentDescription = "Podcast Image",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+                    .padding(bottom = 16.dp),
+                contentScale = ContentScale.Crop
+            )
+        }
+
+        // Title
+        Text(
+            text = state.podcast.title,
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        // Publication Date
+        if (state.podcast.pubDate.isNotEmpty()) {
+            Text(
+                text = state.podcast.pubDate,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
+
+        // Duration
+        if (!state.podcast.duration.isNullOrEmpty()) {
+            Text(
+                text = "Duration: ${state.podcast.duration}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Audio Player
+        if (!state.podcast.audioUrl.isNullOrEmpty()) {
+            Timber.d("audio url: ${state.podcast.audioUrl}")
+            PodcastAudioPlayer(
+                title = state.podcast.title,
+                isPlaying = state.playbackState.isPlaying,
+                currentPosition = state.playbackState.currentPosition,
+                duration = state.playbackState.duration,
+                onPlayPauseClick = { viewModel.togglePlayPause() },
+                onSeekTo = { position -> viewModel.seekTo(position) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Description
+        if (state.podcast.description.isNotEmpty()) {
+            Text(
+                text = "Description",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .align(Alignment.Start)
+                    .padding(bottom = 8.dp)
+            )
+            Text(
+                text = state.podcast.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

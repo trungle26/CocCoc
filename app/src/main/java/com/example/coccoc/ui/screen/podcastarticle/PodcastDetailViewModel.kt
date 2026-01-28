@@ -4,10 +4,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Environment
 import android.os.IBinder
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.util.UnstableApi
 import com.example.coccoc.domain.model.Article
 import com.example.coccoc.domain.usecase.GetPodcastDetailUseCase
 import com.example.coccoc.service.AudioPlaybackService
@@ -17,19 +18,20 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+@UnstableApi
 @HiltViewModel
 class PodcastDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val getPodcastDetailUseCase: GetPodcastDetailUseCase,
-    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val audioDownloadManager = AudioDownloadManager(context)
-    private val _uiState = MutableStateFlow(PodcastDetailUiState())
+    private val _uiState = MutableStateFlow<PodcastDetailUiState>(PodcastDetailUiState.Loading)
     val uiState: StateFlow<PodcastDetailUiState> = _uiState.asStateFlow()
 
     private var serviceBinder: AudioPlaybackService.AudioPlaybackBinder? = null
@@ -44,12 +46,18 @@ class PodcastDetailViewModel @Inject constructor(
             Timber.d("Service connected")
 
             viewModelScope.launch {
-                binder.getService().playbackState.collect { state ->
-                    _uiState.value = _uiState.value.copy(
-                        isPlaying = state.isPlaying,
-                        currentPosition = state.currentPosition,
-                        duration = state.duration
-                    )
+                binder.getService().playbackState.collect { audioPlaybackState ->
+                    _uiState.update { currentState ->
+                        if (currentState is PodcastDetailUiState.Success) {
+                            currentState.copy(
+                                playbackState = currentState.playbackState.copy(
+                                    isPlaying = audioPlaybackState.isPlaying,
+                                    currentPosition = audioPlaybackState.currentPosition,
+                                    duration = audioPlaybackState.duration
+                                )
+                            )
+                        } else currentState
+                    }
                 }
             }
 
@@ -80,21 +88,18 @@ class PodcastDetailViewModel @Inject constructor(
     fun loadPodcast(podcast: Article) {
         Timber.d("loadPodcast called for: ${podcast.title}")
 
-        // Check if this podcast is already loaded
-        if(_uiState.value.podcast?.audioUrl == podcast.audioUrl) {
+        val currentState = _uiState.value
+        if (currentState is PodcastDetailUiState.Success &&
+            currentState.podcast.audioUrl == podcast.audioUrl) {
             Timber.d("Podcast already loaded, skipping reload")
             return
         }
 
-        _uiState.value = _uiState.value.copy(isLoading = true)
+        _uiState.value = PodcastDetailUiState.Loading
         viewModelScope.launch {
             val result = getPodcastDetailUseCase.execute(podcast)
             result.onSuccess { loadedPodcast ->
-                _uiState.value = _uiState.value.copy(
-                    podcast = loadedPodcast,
-                    isLoading = false,
-                    error = null
-                )
+                _uiState.value = PodcastDetailUiState.Success(podcast = loadedPodcast)
                 Timber.d("Podcast loaded: ${loadedPodcast.title}")
 
                 pendingPodcast = loadedPodcast
@@ -120,9 +125,8 @@ class PodcastDetailViewModel @Inject constructor(
                 }
             }
             result.onFailure { exception ->
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = exception.message ?: "Unknown error"
+                _uiState.value = PodcastDetailUiState.Error(
+                    errorMessage = exception.message ?: "Unknown error"
                 )
                 Timber.e(exception, "Failed to load podcast")
             }
@@ -143,50 +147,72 @@ class PodcastDetailViewModel @Inject constructor(
         serviceBinder?.getService()?.seekTo(position)
     }
 
-    fun downloadPodcast(showToast: (String) -> Unit) {
-        if (_uiState.value.isDownloading) return
+    fun clearMessage() {
+        _uiState.update { currentState ->
+            when (currentState) {
+                is PodcastDetailUiState.Success -> currentState.copy(message = null)
+                else -> currentState
+            }
+        }
+    }
 
-        val podcast = _uiState.value.podcast
-        val audioUrl = podcast?.audioUrl
+    fun downloadPodcast() {
+        val currentState = _uiState.value
+        if (currentState !is PodcastDetailUiState.Success) return
+
+        val podcast = currentState.podcast
+        val audioUrl = podcast.audioUrl
 
         if (audioUrl.isNullOrEmpty()) {
-            _uiState.value = _uiState.value.copy(
-                message = "No audio URL available"
-            )
+            _uiState.update { state ->
+                if (state is PodcastDetailUiState.Success) {
+                    state.copy(message = "No audio URL available")
+                } else state
+            }
             return
         }
 
-        _uiState.value = _uiState.value.copy(isDownloading = true)
+        _uiState.value = currentState.copy(isDownloading = true)
+
         viewModelScope.launch {
             try {
                 val fileName = audioDownloadManager.getFileNameFromUrl(audioUrl)
 
                 val result = audioDownloadManager.downloadAudio(audioUrl, fileName)
                 if (result == -1L) {
-                    _uiState.value = _uiState.value.copy(
-                        isDownloading = false,
-                        message = "Download failed"
-                    )
+                    _uiState.update { state ->
+                        if (state is PodcastDetailUiState.Success) {
+                            state.copy(
+                                isDownloading = false,
+                                message = "Download failed"
+                            )
+                        } else state
+                    }
                     Timber.e("Failed to download podcast")
                 } else {
-                    // Get download directory path
-                    val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(
-                        android.os.Environment.DIRECTORY_DOWNLOADS
+                    val downloadDir = Environment.getExternalStoragePublicDirectory(
+                        Environment.DIRECTORY_DOWNLOADS
                     ).absolutePath
                     val fullPath = "$downloadDir/$fileName"
 
-                    showToast("Downloaded to: $fullPath")
-                    _uiState.value = _uiState.value.copy(
-                        isDownloading = false,
-                        message = "Podcast downloaded successfully"
-                    )
-                    Timber.d("Podcast downloaded: $fullPath")
+                    _uiState.update { state ->
+                        if (state is PodcastDetailUiState.Success) {
+                            state.copy(
+                                isDownloading = false,
+                                message = "Added to download queue: $fullPath"
+                            )
+                        } else state
+                    }
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isDownloading = false,
-                    message = "Error: ${e.message}"
-                )
+                _uiState.update { state ->
+                    if (state is PodcastDetailUiState.Success) {
+                        state.copy(
+                            isDownloading = false,
+                            message = "Error: ${e.message}"
+                        )
+                    } else state
+                }
                 Timber.e(e, "Error downloading podcast")
             }
         }
