@@ -1,13 +1,18 @@
 package com.example.coccoc.ui.screen.normalarticle
 
+import android.Manifest
+import android.os.Build
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,13 +22,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,10 +51,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.example.coccoc.R
 import com.example.coccoc.domain.model.Article
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -68,8 +75,8 @@ fun ArticleDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val webViewReference = remember { mutableListOf<WebView>() }
 
-    val notificationPermissionState = if (android.os.Build.VERSION.SDK_INT >= 33) {
-        rememberPermissionState(android.Manifest.permission.POST_NOTIFICATIONS)
+    val notificationPermissionState = if (Build.VERSION.SDK_INT >= 33) {
+        rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS)
     } else null
 
     LaunchedEffect(article.link) {
@@ -99,7 +106,6 @@ fun ArticleDetailScreen(
         }
     }
 
-    // Scaffold wraps all states for consistent back button
     Scaffold(
         topBar = {
             TopAppBar(
@@ -122,8 +128,9 @@ fun ArticleDetailScreen(
                         val state = uiState as ArticleDetailUiState.Success
                         IconButton(
                             onClick = {
-                                if (android.os.Build.VERSION.SDK_INT >= 33 &&
-                                    notificationPermissionState?.status?.isGranted == false) {
+                                if (Build.VERSION.SDK_INT >= 33 &&
+                                    notificationPermissionState?.status?.isGranted == false
+                                ) {
                                     notificationPermissionState.launchPermissionRequest()
                                 }
                                 viewModel.showDownloadDialog()
@@ -134,7 +141,10 @@ fun ArticleDetailScreen(
                                 CircularProgressIndicator(modifier = Modifier.padding(8.dp))
                             } else {
                                 Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(8.dp),
+                                    painter = painterResource(R.drawable.music_download_button),
                                     contentDescription = "Download Audio",
                                     tint = if (state.audioState.hasDetectedAudio)
                                         MaterialTheme.colorScheme.onSurface
@@ -151,7 +161,10 @@ fun ArticleDetailScreen(
                                 CircularProgressIndicator(modifier = Modifier.padding(8.dp))
                             } else {
                                 Icon(
-                                    imageVector = Icons.Default.Create,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(8.dp),
+                                    painter = painterResource(R.drawable.ai_logo_svg),
                                     contentDescription = "Summarize"
                                 )
                             }
@@ -218,88 +231,15 @@ private fun ArticleDetailContent(
     article: Article,
     viewModel: ArticleDetailViewModel,
     webViewReference: MutableList<WebView>,
-    innerPadding: androidx.compose.foundation.layout.PaddingValues
+    innerPadding: PaddingValues
 ) {
     if (state.audioState.showDownloadDialog) {
-        var selectedIndex by remember { mutableIntStateOf(0) }
-
-        AlertDialog(
-            onDismissRequest = { viewModel.hideDownloadDialog() },
-            title = {
-                Text(
-                    text = if (state.audioState.audioUrlsList.size > 1)
-                        "Select Audio to Download"
-                    else
-                        "Download Audio"
-                )
-            },
-            text = {
-                Column {
-                    if (state.audioState.audioUrlsList.size > 1) {
-                        Text(
-                            text = "${state.audioState.audioUrlsList.size} audio files found. Select one to download:",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-                    }
-
-                    LazyColumn {
-                        items(state.audioState.audioUrlsList.size) { index ->
-                            val audioInfo = state.audioState.audioUrlsList[index]
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable { selectedIndex = index }
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    if (state.audioState.audioUrlsList.size > 1) {
-                                        RadioButton(
-                                            selected = selectedIndex == index,
-                                            onClick = { selectedIndex = index }
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                    }
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = audioInfo.fileName,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "Will be saved to Downloads folder",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (state.audioState.audioUrlsList.isNotEmpty()) {
-                            viewModel.downloadSelectedAudio(state.audioState.audioUrlsList[selectedIndex])
-                        }
-                    }
-                ) {
-                    Text("Download")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.hideDownloadDialog() }) {
-                    Text("Cancel")
-                }
+        DownloadDialog(
+            state = state,
+            onDownload = { index ->
+                viewModel.downloadSelectedAudio(state.audioState.audioUrlsList[index])
+            }, onDismiss = {
+                viewModel.hideDownloadDialog()
             }
         )
     }
@@ -324,6 +264,12 @@ private fun ArticleDetailContent(
                             }
                             return super.shouldInterceptRequest(view, request)
                         }
+
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            // Page finished loading, store WebView reference in ViewModel
+                            view?.let { viewModel.setWebView(it) }
+                        }
                     }
                     settings.apply {
                         javaScriptEnabled = true
@@ -340,50 +286,146 @@ private fun ArticleDetailContent(
         )
 
         if (state.summarizationState.summary.isNotEmpty()) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .align(Alignment.BottomCenter),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                colors = androidx.compose.material3.CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+            SummarizedText(viewModel, state)
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.SummarizedText(
+    viewModel: ArticleDetailViewModel,
+    state: ArticleDetailUiState.Success
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .align(Alignment.BottomCenter),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
+                Text(
+                    text = "AI Summary",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                IconButton(
+                    onClick = { viewModel.clearSummary() },
+                    modifier = Modifier.size(24.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "AI Summary",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        IconButton(
-                            onClick = { viewModel.clearSummary() },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close summary",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = state.summarizationState.summary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close summary",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = state.summarizationState.summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
     }
+}
+
+@Composable
+private fun DownloadDialog(
+    state: ArticleDetailUiState.Success,
+    onDownload: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selectedIndex by remember { mutableIntStateOf(0) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = if (state.audioState.audioUrlsList.size > 1)
+                    "Select Audio to Download"
+                else
+                    "Download Audio"
+            )
+        },
+        text = {
+            Column {
+                if (state.audioState.audioUrlsList.size > 1) {
+                    Text(
+                        text = "${state.audioState.audioUrlsList.size} audio files found. Select one to download:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                }
+
+                LazyColumn {
+                    items(state.audioState.audioUrlsList.size) { index ->
+                        val audioInfo = state.audioState.audioUrlsList[index]
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable { selectedIndex = index }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (state.audioState.audioUrlsList.size > 1) {
+                                    RadioButton(
+                                        selected = selectedIndex == index,
+                                        onClick = { selectedIndex = index }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = audioInfo.fileName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Will be saved to Downloads folder",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (state.audioState.audioUrlsList.isNotEmpty()) {
+                        onDownload(selectedIndex)
+                    }
+                }
+            ) {
+                Text("Download")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 private fun isAudioUrl(url: String): Boolean {

@@ -10,9 +10,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
 import com.example.coccoc.domain.model.Article
-import com.example.coccoc.domain.usecase.GetPodcastDetailUseCase
 import com.example.coccoc.service.AudioPlaybackService
-import com.example.coccoc.utils.audio.AudioDownloadManager
+import com.example.coccoc.utils.AudioDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +26,6 @@ import javax.inject.Inject
 @HiltViewModel
 class PodcastDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val getPodcastDetailUseCase: GetPodcastDetailUseCase,
 ) : ViewModel() {
 
     private val audioDownloadManager = AudioDownloadManager(context)
@@ -95,40 +93,35 @@ class PodcastDetailViewModel @Inject constructor(
             return
         }
 
-        _uiState.value = PodcastDetailUiState.Loading
-        viewModelScope.launch {
-            val result = getPodcastDetailUseCase.execute(podcast)
-            result.onSuccess { loadedPodcast ->
-                _uiState.value = PodcastDetailUiState.Success(podcast = loadedPodcast)
-                Timber.d("Podcast loaded: ${loadedPodcast.title}")
+        if (podcast.audioUrl.isNullOrBlank()) {
+            Timber.e("Podcast has no audio URL: ${podcast.title}")
+            _uiState.value = PodcastDetailUiState.Error(
+                errorMessage = "This podcast has no audio available"
+            )
+            return
+        }
 
-                pendingPodcast = loadedPodcast
+        _uiState.value = PodcastDetailUiState.Success(podcast = podcast)
+        Timber.d("Podcast loaded: ${podcast.title}, audioUrl: ${podcast.audioUrl}")
 
-                if (!isBound) {
-                    Timber.d("Service not bound, binding to service")
-                    bindToService()
-                } else {
-                    // Check if service is already playing this podcast
-                    val service = serviceBinder?.getService()
-                    val currentAudioUrl = service?.playbackState?.value?.audioUrl
+        pendingPodcast = podcast
 
-                    if (currentAudioUrl != loadedPodcast.audioUrl) {
-                        Timber.d("Service bound but different podcast, playing new podcast")
-                        service?.prepareAndPlay(
-                            audioUrl = loadedPodcast.audioUrl ?: "",
-                            title = loadedPodcast.title,
-                            article = loadedPodcast
-                        )
-                    } else {
-                        Timber.d("Service already playing this podcast, not reloading")
-                    }
-                }
-            }
-            result.onFailure { exception ->
-                _uiState.value = PodcastDetailUiState.Error(
-                    errorMessage = exception.message ?: "Unknown error"
+        if (!isBound) {
+            Timber.d("Service not bound, binding to service")
+            bindToService()
+        } else {
+            val service = serviceBinder?.getService()
+            val currentAudioUrl = service?.playbackState?.value?.audioUrl
+
+            if (currentAudioUrl != podcast.audioUrl) {
+                Timber.d("Service bound but different podcast, playing new podcast")
+                service?.prepareAndPlay(
+                    audioUrl = podcast.audioUrl,
+                    title = podcast.title,
+                    article = podcast
                 )
-                Timber.e(exception, "Failed to load podcast")
+            } else {
+                Timber.d("Service already playing this podcast, not reloading")
             }
         }
     }

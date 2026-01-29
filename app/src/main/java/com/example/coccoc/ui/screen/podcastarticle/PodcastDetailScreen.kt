@@ -1,5 +1,8 @@
 package com.example.coccoc.ui.screen.podcastarticle
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,14 +14,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -27,11 +33,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,24 +46,33 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.media3.common.util.UnstableApi
-import coil.compose.AsyncImage
+import com.example.coccoc.R
 import com.example.coccoc.domain.model.Article
+import com.example.coccoc.ui.component.ErrorSection
+import com.example.coccoc.ui.component.PodcastHeroImage
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import timber.log.Timber
+import java.util.Locale
 
 private fun formatTime(milliseconds: Long): String {
     val totalSeconds = milliseconds / 1000
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
-    return String.format("%d:%02d", minutes, seconds)
+    return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -97,7 +113,8 @@ fun PodcastDetailScreen(
                 title = {
                     Text(
                         text = "Podcast",
-                        maxLines = 1
+                        maxLines = 1,
+                        fontWeight = FontWeight.Bold
                     )
                 },
                 navigationIcon = {
@@ -107,7 +124,11 @@ fun PodcastDetailScreen(
                             contentDescription = "Back"
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         },
         floatingActionButton = {
@@ -115,29 +136,34 @@ fun PodcastDetailScreen(
                 FloatingActionButton(
                     onClick = {
                         if (android.os.Build.VERSION.SDK_INT >= 33 &&
-                            notificationPermissionState?.status?.isGranted == false) {
+                            notificationPermissionState?.status?.isGranted == false
+                        ) {
                             notificationPermissionState.launchPermissionRequest()
                         }
                         viewModel.downloadPodcast()
                     },
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.shadow(8.dp, CircleShape)
                 ) {
                     if ((uiState as PodcastDetailUiState.Success).isDownloading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
                         Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
+                            modifier = Modifier
+                                .size(24.dp),
+                            painter = painterResource(R.drawable.music_download_button),
                             contentDescription = "Download Podcast",
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
             }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         when (val state = uiState) {
             is PodcastDetailUiState.Loading -> {
@@ -152,26 +178,13 @@ fun PodcastDetailScreen(
             }
 
             is PodcastDetailUiState.Error -> {
-                Box(
+                ErrorSection(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = state.errorMessage,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        TextButton(onClick = { viewModel.loadPodcast(podcast) }) {
-                            Text("Retry")
-                        }
-                    }
-                }
+                    error = state.errorMessage,
+                    onRetry = { viewModel.loadPodcast(podcast) }
+                )
             }
 
             is PodcastDetailUiState.Success -> {
@@ -199,81 +212,77 @@ private fun PodcastDetailContent(
             .fillMaxSize()
             .padding(innerPadding)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Podcast Image
-        if (!state.podcast.imageUrl.isNullOrEmpty()) {
-            AsyncImage(
-                model = state.podcast.imageUrl,
-                contentDescription = "Podcast Image",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-                    .padding(bottom = 16.dp),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        // Title
-        Text(
-            text = state.podcast.title,
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 8.dp)
+        PodcastHeroImage(
+            imageUrl = state.podcast.imageUrl,
+            title = state.podcast.title,
+            pubDate = state.podcast.pubDate,
+            duration = state.podcast.duration
         )
 
-        // Publication Date
-        if (state.podcast.pubDate.isNotEmpty()) {
-            Text(
-                text = state.podcast.pubDate,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-        }
+        Column(
+            modifier = Modifier.padding(20.dp)
+        ) {
+            if (!state.podcast.audioUrl.isNullOrEmpty()) {
+                Timber.d("audio url: ${state.podcast.audioUrl}")
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    PodcastAudioPlayer(
+                        title = state.podcast.title,
+                        isPlaying = state.playbackState.isPlaying,
+                        currentPosition = state.playbackState.currentPosition,
+                        duration = state.playbackState.duration,
+                        onPlayPauseClick = { viewModel.togglePlayPause() },
+                        onSeekTo = { position -> viewModel.seekTo(position) },
+                        onSkipForward = { viewModel.seekTo(state.playbackState.currentPosition + 10000) },
+                        onSkipBackward = {
+                            viewModel.seekTo(
+                                (state.playbackState.currentPosition - 10000).coerceAtLeast(
+                                    0
+                                )
+                            )
+                        },
+                        modifier = Modifier.padding(20.dp)
+                    )
+                }
+            }
 
-        // Duration
-        if (!state.podcast.duration.isNullOrEmpty()) {
-            Text(
-                text = "Duration: ${state.podcast.duration}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-        }
+            if (state.podcast.description.isNotEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp)
+                    ) {
+                        Text(
+                            text = "About this episode",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
 
-        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-        // Audio Player
-        if (!state.podcast.audioUrl.isNullOrEmpty()) {
-            Timber.d("audio url: ${state.podcast.audioUrl}")
-            PodcastAudioPlayer(
-                title = state.podcast.title,
-                isPlaying = state.playbackState.isPlaying,
-                currentPosition = state.playbackState.currentPosition,
-                duration = state.playbackState.duration,
-                onPlayPauseClick = { viewModel.togglePlayPause() },
-                onSeekTo = { position -> viewModel.seekTo(position) },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Description
-        if (state.podcast.description.isNotEmpty()) {
-            Text(
-                text = "Description",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier
-                    .align(Alignment.Start)
-                    .padding(bottom = 8.dp)
-            )
-            Text(
-                text = state.podcast.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                        Text(
+                            text = state.podcast.description,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 24.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -286,28 +295,56 @@ fun PodcastAudioPlayer(
     duration: Long,
     onPlayPauseClick: () -> Unit,
     onSeekTo: (Long) -> Unit,
+    onSkipForward: () -> Unit,
+    onSkipBackward: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val playPauseScale by animateFloatAsState(
+        targetValue = if (isPlaying) 1.1f else 1f,
+        animationSpec = tween(300)
+    )
+
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(16.dp)
+        modifier = modifier.animateContentSize()
     ) {
-        // Title
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Slider(
+                value = if (duration > 0) currentPosition.toFloat() else 0f,
+                onValueChange = { newPosition ->
+                    onSeekTo(newPosition.toLong())
+                },
+                valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
+                modifier = Modifier.fillMaxWidth(),
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                )
+            )
 
-        Spacer(modifier = Modifier.height(12.dp))
+            // Time display
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = formatTime(currentPosition),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = formatTime(duration),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
-        // Player Controls
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Player Controls with skip buttons
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -315,49 +352,68 @@ fun PodcastAudioPlayer(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Skip backward 10s
+            IconButton(
+                onClick = onSkipBackward,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.seekback),
+                    contentDescription = "Skip backward 10 seconds",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(20.dp))
+
+            // Play/Pause button (larger, centered)
             IconButton(
                 onClick = onPlayPauseClick,
                 modifier = Modifier
-                    .size(56.dp)
+                    .size(72.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(50)
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.secondary
+                            )
+                        ),
+                        shape = CircleShape
                     )
+                    .graphicsLayer {
+                        scaleX = playPauseScale
+                        scaleY = playPauseScale
+                    }
             ) {
                 Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Build else Icons.Filled.PlayArrow,
+                    painter = painterResource(if (isPlaying) R.drawable.pause else R.drawable.play),
                     contentDescription = if (isPlaying) "Pause" else "Play",
                     tint = Color.White,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp)
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.width(20.dp))
 
-        // Seekable progress slider
-        Slider(
-            value = if (duration > 0) currentPosition.toFloat() else 0f,
-            onValueChange = { newPosition ->
-                onSeekTo(newPosition.toLong())
-            },
-            valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // Time display
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = formatTime(currentPosition),
-                style = MaterialTheme.typography.labelSmall
-            )
-            Text(
-                text = formatTime(duration),
-                style = MaterialTheme.typography.labelSmall
-            )
+            // Skip forward 10s
+            IconButton(
+                onClick = onSkipForward,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.seekback),
+                    contentDescription = "Skip forward 10 seconds",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(28.dp).scale(scaleX = -1f, scaleY = 1f)
+                )
+            }
         }
     }
 }

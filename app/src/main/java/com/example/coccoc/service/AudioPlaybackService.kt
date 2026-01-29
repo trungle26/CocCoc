@@ -35,6 +35,7 @@ import timber.log.Timber
 import com.example.coccoc.MainActivity
 import com.example.coccoc.R
 import com.example.coccoc.domain.model.Article
+import com.example.coccoc.domain.model.Constants
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.URLEncoder
@@ -132,7 +133,7 @@ class AudioPlaybackService : MediaSessionService() {
                         // Add deep link data to navigate to podcast detail
                         currentArticle?.let { article ->
                             val json = Json.encodeToString(article)
-                            val encoded = URLEncoder.encode(json, "UTF-8")
+                            val encoded = URLEncoder.encode(json, Constants.ENCODING_UTF8)
                             putExtra("navigate_to", "podcast_detail/$encoded")
                         }
                     }
@@ -237,6 +238,16 @@ class AudioPlaybackService : MediaSessionService() {
 
     fun prepareAndPlay(audioUrl: String, title: String, article: Article? = null) {
         try {
+            if (audioUrl.isBlank()) {
+                Timber.e("prepareAndPlay called with empty URL, title: $title")
+                return
+            }
+
+            if (title.isBlank()) {
+                Timber.e("prepareAndPlay called with empty title, URL: $audioUrl")
+                return
+            }
+
             Timber.d("prepareAndPlay called with URL: $audioUrl, title: $title")
             currentArticle = article
 

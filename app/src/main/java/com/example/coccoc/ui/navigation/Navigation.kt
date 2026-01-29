@@ -12,6 +12,7 @@ import com.example.coccoc.domain.model.Article
 import com.example.coccoc.ui.screen.normalarticle.ArticleDetailScreen
 import com.example.coccoc.ui.screen.ArticleListScreen
 import com.example.coccoc.ui.screen.podcastarticle.PodcastDetailScreen
+import com.example.coccoc.domain.model.Constants
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import timber.log.Timber
@@ -45,15 +46,13 @@ fun AppNavHost(
 ) {
     val navController = rememberNavController()
 
-    // Handle deep link navigation when activity receives new intent
     LaunchedEffect(startDestination) {
         if (startDestination != NavigationRoute.ArticleList.route) {
             Timber.d("Navigating to deep link: $startDestination")
-            // Check if we're already on this destination
+
             val currentRoute = navController.currentBackStackEntry?.destination?.route
             if (currentRoute != startDestination) {
                 navController.navigate(startDestination) {
-                    // Don't create multiple instances of the same destination
                     launchSingleTop = true
                 }
             }
@@ -91,10 +90,11 @@ fun AppNavHost(
                 val decoded = URLDecoder.decode(articleJson, "UTF-8")
                 Json.decodeFromString<Article>(decoded)
             } catch (e: Exception) {
+                Timber.e(e, "Failed to decode article JSON for ArticleDetail")
                 Article(
-                    title = "",
+                    title = "Error Loading Article",
                     link = "",
-                    description = e.toString(),
+                    description = "Failed to load article: ${e.message}",
                     pubDate = "",
                     imageUrl = null
                 )
@@ -105,23 +105,25 @@ fun AppNavHost(
         composable(
             route = NavigationRoute.PodcastDetail.route,
             arguments = listOf(
-                navArgument("article") {
+                navArgument(Constants.NAV_ARG_ARTICLE) {
                     type = NavType.StringType
                 }
             )
         ) { backStackEntry ->
-            val articleJson = backStackEntry.arguments?.getString("article") ?: ""
+            val articleJson = backStackEntry.arguments?.getString(Constants.NAV_ARG_ARTICLE) ?: ""
             val article = try {
-                val decoded = URLDecoder.decode(articleJson, "UTF-8")
+                val decoded = URLDecoder.decode(articleJson, Constants.ENCODING_UTF8)
                 Json.decodeFromString<Article>(decoded)
             } catch (e: Exception) {
+                Timber.e(e, "Failed to decode article JSON for PodcastDetail")
                 Article(
-                    title = "",
+                    title = "Error Loading Podcast",
                     link = "",
-                    description = e.toString(),
+                    description = "Failed to load podcast: ${e.message}",
                     pubDate = "",
                     imageUrl = null,
-                    type = "podcast"
+                    audioUrl = null, // Explicitly set to null so validation catches it
+                    type = Constants.ARTICLE_TYPE_PODCAST
                 )
             }
 

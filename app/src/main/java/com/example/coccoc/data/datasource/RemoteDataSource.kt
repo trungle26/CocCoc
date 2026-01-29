@@ -2,6 +2,7 @@ package com.example.coccoc.data.datasource
 
 import android.util.Xml
 import com.example.coccoc.domain.model.Article
+import com.example.coccoc.domain.model.Constants
 import org.xmlpull.v1.XmlPullParser
 import java.net.HttpURLConnection
 import java.net.URL
@@ -97,7 +98,7 @@ class RemoteDataSource @Inject constructor(
                                 imageUrl = null,
                                 audioUrl = null,
                                 duration = null,
-                                type = "podcast"
+                                type = Constants.ARTICLE_TYPE_PODCAST
                             )
                             imageUrl = null
                             audioUrl = null

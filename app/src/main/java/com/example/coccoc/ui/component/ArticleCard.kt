@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.coccoc.R
 import com.example.coccoc.domain.model.Article
+import com.example.coccoc.domain.model.Constants
 
 @Composable
 fun ArticleCard(
@@ -32,7 +33,7 @@ fun ArticleCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isPodcast = article.type == "podcast"
+    val isPodcast = article.type == Constants.ARTICLE_TYPE_PODCAST
 
     Row(
         modifier = modifier

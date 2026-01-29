@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -17,6 +19,16 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        // 2. Load the key from local.properties
+        val localProperties = Properties()
+        val localFile = rootProject.file("local.properties")
+        if (localFile.exists()) {
+            localProperties.load(localFile.inputStream())
+        }
+        val geminiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
+
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -35,6 +47,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -72,7 +85,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.timber)
-    implementation("com.google.ai.client.generativeai:generativeai:0.7.0")
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
 
     // Room

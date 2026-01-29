@@ -1,53 +1,46 @@
 package com.example.coccoc.utils
 
+import com.example.coccoc.BuildConfig
 import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
-/**
- * Content Summarizer using Google Gemini AI (Free tier available)
- *
- * To get your free API key:
- * 1. Go to https://aistudio.google.com/apikey
- * 2. Sign in with your Google account
- * 3. Click "Create API key"
- * 4. Copy the key and paste it below
- *
- * Free tier limits (as of 2024):
- * - 15 requests per minute
- * - 1 million tokens per minute
- * - 1,500 requests per day
- */
 class ContentSummarizer {
-    // TODO: Replace with your Gemini API key from https://aistudio.google.com/apikey
-    private val apiKey = "YOUR_GEMINI_API_KEY_HERE"
-
-    // Using gemini-pro - stable and free model
-    // You can also try: "gemini-1.5-flash", "gemini-1.5-pro"
+    private val apiKey = BuildConfig.GEMINI_API_KEY
     private val generativeModel by lazy {
         GenerativeModel(
-            modelName = "gemini-pro",
+            modelName = "gemini-2.5-flash-lite",
             apiKey = apiKey
         )
     }
 
     suspend fun summarizeText(content: String): String = withContext(Dispatchers.IO) {
-        if (apiKey == "YOUR_GEMINI_API_KEY_HERE" || apiKey.isEmpty()) {
-            return@withContext "Please set your Gemini API key in ContentSummarizer.kt\nGet free key at: https://aistudio.google.com/apikey"
+        if (apiKey.isBlank() || apiKey == "null") {
+            return@withContext "Please set GEMINI_API_KEY in your local.properties file."
         }
 
         try {
-            // Limit content to avoid token limits (roughly 4 chars per token)
-            val maxChars = 10000
+            // Reduce max chars to avoid API errors (roughly 4 chars per token)
+            // Gemini Pro can handle ~30k tokens input, but keeping it conservative
+            val maxChars = 4000
+
+            // Clean and limit content
             val cleanContent = content
-                .replace(Regex("\\s+"), " ")
+                .replace(Regex("\\s+"), " ") // Normalize whitespace
+                .replace(Regex("[^\\p{L}\\p{N}\\s.,!?;:'\"-]"), "") // Remove special chars
                 .trim()
                 .take(maxChars)
 
+            if (cleanContent.length < 50) {
+                return@withContext "Content too short to summarize"
+            }
+
+            Timber.d("Sending ${cleanContent.length} characters to Gemini API")
+
             val prompt = """
-                Summarize the following article in Vietnamese. 
-                Provide a concise summary in 3-4 sentences that captures the main points.
+                Summarize the following Vietnamese article concisely in 3-4 sentences.
+                Focus on the main points and key information.
                 
                 Article:
                 $cleanContent
@@ -55,21 +48,28 @@ class ContentSummarizer {
 
             val response = generativeModel.generateContent(prompt)
 
-            val summary = response.text ?: "Unable to generate summary."
+            val summary = response.text?.trim() ?: "Unable to generate summary."
             Timber.d("Gemini AI Summary: $summary")
 
             return@withContext summary
         } catch (e: Exception) {
-            Timber.e(e, "Error calling Gemini API: ${e.message}")
+            val errorMsg = e.message ?: "Unknown error"
+            Timber.e(e, "Error calling Gemini API: $errorMsg")
+
             return@withContext when {
-                e.message?.contains("API key") == true -> "Invalid API key. Get a free key at: https://aistudio.google.com/apikey"
-                e.message?.contains("quota") == true -> "API quota exceeded. Try again later."
-                e.message?.contains("429") == true -> "Rate limit reached. Please wait a moment."
-                e.message?.contains("not found") == true || e.message?.contains("NOT_FOUND") == true ->
-                    "Model not available. Try updating the Gemini SDK or use a different model."
-                e.message?.contains("MissingFieldException") == true ->
-                    "API response error. Please check your API key and try again."
-                else -> "Error: ${e.message ?: "Unknown error"}"
+                errorMsg.contains("API key", ignoreCase = true) ->
+                    "Invalid API key. Get a free key at: https://aistudio.google.com/apikey"
+                errorMsg.contains("quota", ignoreCase = true) ->
+                    "API quota exceeded. Try again later."
+                errorMsg.contains("429") ->
+                    "Rate limit reached. Please wait a moment."
+                errorMsg.contains("not found", ignoreCase = true) || errorMsg.contains("NOT_FOUND") ->
+                    "Model not available. Try using 'gemini-1.5-flash' model instead."
+                errorMsg.contains("MissingFieldException") || errorMsg.contains("response error", ignoreCase = true) ->
+                    "Content too large or API issue. Try with a shorter article."
+                errorMsg.contains("blocked", ignoreCase = true) || errorMsg.contains("safety", ignoreCase = true) ->
+                    "Content blocked by safety filters."
+                else -> "Error: $errorMsg"
             }
         }
     }

@@ -1,4 +1,4 @@
-package com.example.coccoc.utils
+package com.example.coccoc.domain.model
 
 object Constants {
     // Article Types

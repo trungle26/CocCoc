@@ -1,12 +1,12 @@
 package com.example.coccoc.ui.screen.normalarticle
 
 import android.content.Context
+import android.webkit.WebView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.coccoc.domain.model.Article
-import com.example.coccoc.domain.usecase.GetArticleDetailUseCase
 import com.example.coccoc.utils.ContentSummarizer
-import com.example.coccoc.utils.audio.AudioDownloadManager
+import com.example.coccoc.utils.AudioDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,42 +15,37 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.lang.ref.WeakReference
 import javax.inject.Inject
 
 @HiltViewModel
 class ArticleDetailViewModel @Inject constructor(
     @ApplicationContext val context: Context,
-    private val getArticleDetailUseCase: GetArticleDetailUseCase,
 ) : ViewModel() {
 
     private val audioDownloadManager = AudioDownloadManager(context)
     private val contentSummarizer = ContentSummarizer()
+    private val webContentExtractor = com.example.coccoc.utils.WebContentExtractor()
 
     private val _uiState = MutableStateFlow<ArticleDetailUiState>(ArticleDetailUiState.Loading)
     val uiState: StateFlow<ArticleDetailUiState> = _uiState.asStateFlow()
 
+    private var webViewRef: WeakReference<WebView>? = null
+    private var extractedWebContent: String? = null
+
     fun loadArticle(article: Article) {
-        _uiState.value = ArticleDetailUiState.Loading
-        viewModelScope.launch {
-            try {
-                val result = getArticleDetailUseCase.execute(article)
-                result.onSuccess { loadedArticle ->
-                    _uiState.value = ArticleDetailUiState.Success(article = loadedArticle)
-                    Timber.d("Article loaded: ${loadedArticle.title}")
-                }
-                result.onFailure { exception ->
-                    _uiState.value = ArticleDetailUiState.Error(
-                        errorMessage = exception.message ?: "Unknown error"
-                    )
-                    Timber.e(exception, "Failed to load article")
-                }
-            } catch (e: Exception) {
-                _uiState.value = ArticleDetailUiState.Error(
-                    errorMessage = e.message ?: "Unknown error"
-                )
-                Timber.e(e, "Error loading article")
-            }
-        }
+        _uiState.value = ArticleDetailUiState.Success(article = article)
+        Timber.d("Article loaded: ${article.title}")
+    }
+
+    fun setWebView(view: WebView) {
+        webViewRef = WeakReference(view)
+        Timber.d("WebView reference set")
+    }
+
+    fun onWebContentExtracted(content: String) {
+        extractedWebContent = content
+        Timber.d("Web content extracted: ${content.length} characters")
     }
 
     fun addDetectedAudioUrl(url: String) {
@@ -177,20 +172,39 @@ class ArticleDetailViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val article = currentState.article
-                if (article.description.isEmpty()) {
+                // Get WebView reference
+                val webView = webViewRef?.get()
+                if (webView == null) {
                     _uiState.update { state ->
                         if (state is ArticleDetailUiState.Success) {
                             state.copy(
                                 summarizationState = state.summarizationState.copy(isSummarizing = false),
-                                message = "No content to summarize"
+                                message = "WebView not ready, please try again"
                             )
                         } else state
                     }
                     return@launch
                 }
 
-                val summary = contentSummarizer.summarizeHtml(article.description)
+                // Use efficient Readability-based extraction
+                Timber.d("Extracting content using Readability algorithm...")
+                val webContent = webContentExtractor.extractArticleContent(webView)
+
+                if (webContent.isEmpty() || webContent.length < 50) {
+                    _uiState.update { state ->
+                        if (state is ArticleDetailUiState.Success) {
+                            state.copy(
+                                summarizationState = state.summarizationState.copy(isSummarizing = false),
+                                message = "Could not extract enough content (${webContent.length} chars)"
+                            )
+                        } else state
+                    }
+                    return@launch
+                }
+
+                Timber.d("Extracted ${webContent.length} characters, sending to AI...")
+                val summary = contentSummarizer.summarizeText(webContent)
+
                 _uiState.update { state ->
                     if (state is ArticleDetailUiState.Success) {
                         state.copy(
@@ -198,11 +212,11 @@ class ArticleDetailViewModel @Inject constructor(
                                 summary = summary,
                                 isSummarizing = false
                             ),
-                            message = "Summary generated"
+                            message = "Summary generated (${webContent.length} chars analyzed)"
                         )
                     } else state
                 }
-                Timber.d("Content summarized: $summary")
+                Timber.d("Content summarized successfully")
             } catch (e: Exception) {
                 _uiState.update { state ->
                     if (state is ArticleDetailUiState.Success) {
@@ -238,6 +252,9 @@ class ArticleDetailViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        webViewRef?.clear()
+        webViewRef = null
+        extractedWebContent = null
         Timber.d("ArticleDetailViewModel cleared")
         super.onCleared()
     }
