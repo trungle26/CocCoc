@@ -226,6 +226,17 @@ class ArticleDetailViewModel @Inject constructor(
         }
     }
 
+    fun clearSummary() {
+        _uiState.update { currentState ->
+            when (currentState) {
+                is ArticleDetailUiState.Success -> currentState.copy(
+                    summarizationState = currentState.summarizationState.copy(summary = "")
+                )
+                else -> currentState
+            }
+        }
+    }
+
     override fun onCleared() {
         Timber.d("ArticleDetailViewModel cleared")
         super.onCleared()
