@@ -4,6 +4,7 @@ import android.content.Context
 import android.webkit.WebView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.coccoc.R
 import com.example.coccoc.domain.model.Article
 import com.example.coccoc.utils.ContentSummarizer
 import com.example.coccoc.utils.AudioDownloadManager
@@ -24,7 +25,7 @@ class ArticleDetailViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val audioDownloadManager = AudioDownloadManager(context)
-    private val contentSummarizer = ContentSummarizer()
+    private val contentSummarizer = ContentSummarizer(context)
     private val webContentExtractor = com.example.coccoc.utils.WebContentExtractor()
 
     private val _uiState = MutableStateFlow<ArticleDetailUiState>(ArticleDetailUiState.Loading)
@@ -41,11 +42,6 @@ class ArticleDetailViewModel @Inject constructor(
     fun setWebView(view: WebView) {
         webViewRef = WeakReference(view)
         Timber.d("WebView reference set")
-    }
-
-    fun onWebContentExtracted(content: String) {
-        extractedWebContent = content
-        Timber.d("Web content extracted: ${content.length} characters")
     }
 
     fun addDetectedAudioUrl(url: String) {
@@ -70,9 +66,11 @@ class ArticleDetailViewModel @Inject constructor(
                                 audioUrlsList = currentList,
                                 hasDetectedAudio = true
                             ),
-                            message = if (isFirstDetection) "Audio detected! (${currentList.size} file(s))"
-                                     else if (currentList.size > 1) "${currentList.size} audio files detected"
-                                     else null
+                            message = if (isFirstDetection)
+                                context.getString(R.string.audio_detected, currentList.size)
+                            else if (currentList.size > 1)
+                                context.getString(R.string.audio_files_detected, currentList.size)
+                            else null
                         )
                     } else {
                         currentState
@@ -88,7 +86,9 @@ class ArticleDetailViewModel @Inject constructor(
             when (currentState) {
                 is ArticleDetailUiState.Success -> {
                     if (currentState.audioState.audioUrlsList.isEmpty()) {
-                        currentState.copy(message = "No audio found in article")
+                        currentState.copy(
+                            message = context.getString(R.string.no_audio_found)
+                        )
                     } else {
                         currentState.copy(
                             audioState = currentState.audioState.copy(showDownloadDialog = true)
@@ -132,7 +132,7 @@ class ArticleDetailViewModel @Inject constructor(
                         if (state is ArticleDetailUiState.Success) {
                             state.copy(
                                 audioState = state.audioState.copy(isDownloading = false),
-                                message = "Download failed"
+                                message = context.getString(R.string.download_failed)
                             )
                         } else state
                     }
@@ -142,7 +142,7 @@ class ArticleDetailViewModel @Inject constructor(
                         if (state is ArticleDetailUiState.Success) {
                             state.copy(
                                 audioState = state.audioState.copy(isDownloading = false),
-                                message = "Download started: ${audioFileInfo.fileName}"
+                                message = context.getString(R.string.download_started, audioFileInfo.fileName)
                             )
                         } else state
                     }
@@ -152,7 +152,7 @@ class ArticleDetailViewModel @Inject constructor(
                     if (state is ArticleDetailUiState.Success) {
                         state.copy(
                             audioState = state.audioState.copy(isDownloading = false),
-                            message = "Error: ${e.message}"
+                            message = context.getString(R.string.error_summarizing, e.message ?: "Unknown")
                         )
                     } else state
                 }
@@ -179,7 +179,7 @@ class ArticleDetailViewModel @Inject constructor(
                         if (state is ArticleDetailUiState.Success) {
                             state.copy(
                                 summarizationState = state.summarizationState.copy(isSummarizing = false),
-                                message = "WebView not ready, please try again"
+                                message = context.getString(R.string.webview_not_ready)
                             )
                         } else state
                     }
@@ -187,7 +187,7 @@ class ArticleDetailViewModel @Inject constructor(
                 }
 
                 // Use efficient Readability-based extraction
-                Timber.d("Extracting content using Readability algorithm...")
+                Timber.d(context.getString(R.string.extracting_content))
                 val webContent = webContentExtractor.extractArticleContent(webView)
 
                 if (webContent.isEmpty() || webContent.length < 50) {
@@ -195,14 +195,14 @@ class ArticleDetailViewModel @Inject constructor(
                         if (state is ArticleDetailUiState.Success) {
                             state.copy(
                                 summarizationState = state.summarizationState.copy(isSummarizing = false),
-                                message = "Could not extract enough content (${webContent.length} chars)"
+                                message = context.getString(R.string.could_not_extract_content, webContent.length)
                             )
                         } else state
                     }
                     return@launch
                 }
 
-                Timber.d("Extracted ${webContent.length} characters, sending to AI...")
+                Timber.d(context.getString(R.string.sending_to_ai, webContent.length))
                 val summary = contentSummarizer.summarizeText(webContent)
 
                 _uiState.update { state ->
@@ -212,7 +212,7 @@ class ArticleDetailViewModel @Inject constructor(
                                 summary = summary,
                                 isSummarizing = false
                             ),
-                            message = "Summary generated (${webContent.length} chars analyzed)"
+                            message = context.getString(R.string.summary_generated, webContent.length)
                         )
                     } else state
                 }
@@ -222,7 +222,7 @@ class ArticleDetailViewModel @Inject constructor(
                     if (state is ArticleDetailUiState.Success) {
                         state.copy(
                             summarizationState = state.summarizationState.copy(isSummarizing = false),
-                            message = "Error: ${e.message}"
+                            message = context.getString(R.string.error_summarizing, e.message ?: "Unknown")
                         )
                     } else state
                 }

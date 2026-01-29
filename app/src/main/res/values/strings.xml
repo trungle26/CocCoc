@@ -1,3 +1,59 @@
 <resources>
     <string name="app_name">CocCoc</string>
+
+    <!-- Common -->
+    <string name="back">Back</string>
+    <string name="retry">Retry</string>
+    <string name="cancel">Cancel</string>
+    <string name="download">Download</string>
+    <string name="close">Close</string>
+    <string name="refresh">Refresh</string>
+
+    <!-- Article List Screen -->
+    <string name="daily_news">Daily News</string>
+    <string name="no_articles_found">No articles found</string>
+    <string name="loading_articles">Loading articles…</string>
+    <string name="error_loading_articles">Error loading articles</string>
+
+    <!-- Article Detail Screen -->
+    <string name="download_audio">Download Audio</string>
+    <string name="summarize">Summarize</string>
+    <string name="error_loading_article">Error loading article</string>
+
+    <!-- Audio Download -->
+    <string name="audio_detected">Audio detected! (%d file(s))</string>
+    <string name="audio_files_detected">%d audio files detected</string>
+    <string name="no_audio_found">No audio found in article</string>
+    <string name="download_started">Download started: %s</string>
+    <string name="download_failed">Download failed</string>
+    <string name="select_audio_download">Select Audio to Download</string>
+    <string name="download_audio_title">Download Audio</string>
+    <string name="audio_files_found">%d audio files found. Select one to download:</string>
+    <string name="saved_to_downloads">Will be saved to Downloads folder</string>
+
+    <!-- Summarization -->
+    <string name="ai_summary">AI Summary</string>
+    <string name="close_summary">Close summary</string>
+    <string name="webview_not_ready">WebView not ready, please try again</string>
+    <string name="could_not_extract_content">Could not extract enough content (%d chars)</string>
+    <string name="extracting_content">Extracting content using Readability algorithm…</string>
+    <string name="sending_to_ai">Extracted %d characters, sending to AI…</string>
+    <string name="summary_generated">Summary generated (%d chars analyzed)</string>
+    <string name="content_too_short">Content too short to summarize</string>
+    <string name="error_summarizing">Error: %s</string>
+
+    <!-- Podcast Screen -->
+    <string name="podcast">🎙️ Podcast</string>
+    <string name="error_loading_podcast">Error loading podcast</string>
+    <string name="podcast_no_audio">This podcast has no audio available</string>
+    <string name="about_episode">About this episode</string>
+
+    <!-- API Errors -->
+    <string name="api_key_required">Please set your Gemini API key in ContentSummarizer.kt\nGet free key at: https://aistudio.google.com/apikey</string>
+    <string name="invalid_api_key">Invalid API key. Get a free key at: https://aistudio.google.com/apikey</string>
+    <string name="api_quota_exceeded">API quota exceeded. Try again later.</string>
+    <string name="rate_limit_reached">Rate limit reached. Please wait a moment.</string>
+    <string name="model_not_available">Model not available. Try using \'gemini-1.5-flash\' model instead.</string>
+    <string name="content_too_large">Content too large or API issue. Try with a shorter article.</string>
+    <string name="content_blocked">Content blocked by safety filters.</string>
 </resources>

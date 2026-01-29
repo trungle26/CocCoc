@@ -20,9 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -235,7 +232,6 @@ private fun PodcastDetailContent(
                     )
                 ) {
                     PodcastAudioPlayer(
-                        title = state.podcast.title,
                         isPlaying = state.playbackState.isPlaying,
                         currentPosition = state.playbackState.currentPosition,
                         duration = state.playbackState.duration,
@@ -266,7 +262,7 @@ private fun PodcastDetailContent(
                         modifier = Modifier.padding(20.dp)
                     ) {
                         Text(
-                            text = "About this episode",
+                            text = androidx.compose.ui.res.stringResource(R.string.about_episode),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -289,7 +285,6 @@ private fun PodcastDetailContent(
 
 @Composable
 fun PodcastAudioPlayer(
-    title: String,
     isPlaying: Boolean,
     currentPosition: Long,
     duration: Long,

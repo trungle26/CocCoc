@@ -119,7 +119,7 @@ fun ArticleDetailScreen(
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = androidx.compose.ui.res.stringResource(R.string.back)
                         )
                     }
                 },
@@ -145,7 +145,7 @@ fun ArticleDetailScreen(
                                         .fillMaxSize()
                                         .padding(8.dp),
                                     painter = painterResource(R.drawable.music_download_button),
-                                    contentDescription = "Download Audio",
+                                    contentDescription = androidx.compose.ui.res.stringResource(R.string.download_audio),
                                     tint = if (state.audioState.hasDetectedAudio)
                                         MaterialTheme.colorScheme.onSurface
                                     else
@@ -165,7 +165,7 @@ fun ArticleDetailScreen(
                                         .fillMaxSize()
                                         .padding(8.dp),
                                     painter = painterResource(R.drawable.ai_logo_svg),
-                                    contentDescription = "Summarize"
+                                    contentDescription = androidx.compose.ui.res.stringResource(R.string.summarize)
                                 )
                             }
                         }
@@ -204,7 +204,7 @@ fun ArticleDetailScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         TextButton(onClick = { viewModel.loadArticle(article) }) {
-                            Text("Retry")
+                            Text(androidx.compose.ui.res.stringResource(R.string.retry))
                         }
                     }
                 }
@@ -352,16 +352,16 @@ private fun DownloadDialog(
         title = {
             Text(
                 text = if (state.audioState.audioUrlsList.size > 1)
-                    "Select Audio to Download"
+                    androidx.compose.ui.res.stringResource(R.string.select_audio_download)
                 else
-                    "Download Audio"
+                    androidx.compose.ui.res.stringResource(R.string.download_audio_title)
             )
         },
         text = {
             Column {
                 if (state.audioState.audioUrlsList.size > 1) {
                     Text(
-                        text = "${state.audioState.audioUrlsList.size} audio files found. Select one to download:",
+                        text = androidx.compose.ui.res.stringResource(R.string.audio_files_found, state.audioState.audioUrlsList.size),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
@@ -398,7 +398,7 @@ private fun DownloadDialog(
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = "Will be saved to Downloads folder",
+                                        text = androidx.compose.ui.res.stringResource(R.string.saved_to_downloads),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -417,12 +417,12 @@ private fun DownloadDialog(
                     }
                 }
             ) {
-                Text("Download")
+                Text(androidx.compose.ui.res.stringResource(R.string.download))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(androidx.compose.ui.res.stringResource(R.string.cancel))
             }
         }
     )

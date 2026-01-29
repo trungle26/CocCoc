@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.example.coccoc.R
 import com.example.coccoc.domain.model.Article
 import com.example.coccoc.ui.component.ArticleCard
 import com.example.coccoc.ui.component.CompactArticleCard
@@ -58,7 +59,7 @@ fun ArticleListScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Daily News",
+                        text = androidx.compose.ui.res.stringResource(R.string.daily_news),
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -70,7 +71,7 @@ fun ArticleListScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh"
+                            contentDescription = androidx.compose.ui.res.stringResource(R.string.refresh)
                         )
                     }
                 }
@@ -87,8 +88,8 @@ fun ArticleListScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when {
-                articlesPaging.loadState.refresh is LoadState.Loading && articlesPaging.itemCount == 0 -> {
+            when (articlesPaging.loadState.refresh) {
+                is LoadState.Loading if articlesPaging.itemCount == 0 -> {
                     LoadingIndicator(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -96,7 +97,7 @@ fun ArticleListScreen(
                     )
                 }
 
-                articlesPaging.loadState.refresh is LoadState.Error && articlesPaging.itemCount == 0 -> {
+                is LoadState.Error if articlesPaging.itemCount == 0 -> {
                     val error = (articlesPaging.loadState.refresh as LoadState.Error).error
                     ErrorSection(
                         modifier = Modifier
@@ -123,11 +124,8 @@ fun ArticleListScreen(
 
                         var index = 0
                         while (index < minOf(itemCount, 10)) {
-                            val currentIndex = index
-
-                            when {
-                                // Featured articles at specific positions
-                                currentIndex in featuredLayout -> {
+                            when (val currentIndex = index) {
+                                in featuredLayout -> {
                                     item(
                                         key = articlesPaging[currentIndex]?.link
                                             ?: "featured_$currentIndex"
@@ -145,8 +143,9 @@ fun ArticleListScreen(
                                     }
                                     index++
                                 }
+
                                 // Compact side-by-side pairs
-                                currentIndex in compactPairLayout && currentIndex + 1 < itemCount -> {
+                                in compactPairLayout if currentIndex + 1 < itemCount -> {
                                     item(key = "compact_row_$currentIndex") {
                                         Row(
                                             modifier = Modifier
@@ -183,6 +182,7 @@ fun ArticleListScreen(
                                     }
                                     index += 2
                                 }
+
                                 // Regular articles for other positions
                                 else -> {
                                     item(

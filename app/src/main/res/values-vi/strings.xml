@@ -1,0 +1,59 @@
+<resources>
+    <string name="app_name">CocCoc</string>
+
+    <!-- Common -->
+    <string name="back">Quay lại</string>
+    <string name="retry">Thử lại</string>
+    <string name="cancel">Hủy</string>
+    <string name="download">Tải xuống</string>
+    <string name="close">Đóng</string>
+    <string name="refresh">Làm mới</string>
+
+    <!-- Article List Screen -->
+    <string name="daily_news">Tin Tức Hàng Ngày</string>
+    <string name="no_articles_found">Không tìm thấy bài viết</string>
+    <string name="loading_articles">Đang tải bài viết…</string>
+    <string name="error_loading_articles">Lỗi khi tải bài viết</string>
+
+    <!-- Article Detail Screen -->
+    <string name="download_audio">Tải âm thanh</string>
+    <string name="summarize">Tóm tắt</string>
+    <string name="error_loading_article">Lỗi khi tải bài viết</string>
+
+    <!-- Audio Download -->
+    <string name="audio_detected">Đã phát hiện âm thanh! (%d tệp)</string>
+    <string name="audio_files_detected">Đã phát hiện %d tệp âm thanh</string>
+    <string name="no_audio_found">Không tìm thấy âm thanh trong bài viết</string>
+    <string name="download_started">Bắt đầu tải: %s</string>
+    <string name="download_failed">Tải xuống thất bại</string>
+    <string name="select_audio_download">Chọn âm thanh để tải</string>
+    <string name="download_audio_title">Tải âm thanh</string>
+    <string name="audio_files_found">Tìm thấy %d tệp âm thanh. Chọn một để tải xuống:</string>
+    <string name="saved_to_downloads">Sẽ được lưu vào thư mục Tải xuống</string>
+
+    <!-- Summarization -->
+    <string name="ai_summary">Tóm tắt AI</string>
+    <string name="close_summary">Đóng tóm tắt</string>
+    <string name="webview_not_ready">WebView chưa sẵn sàng, vui lòng thử lại</string>
+    <string name="could_not_extract_content">Không thể trích xuất đủ nội dung (%d ký tự)</string>
+    <string name="extracting_content">Đang trích xuất nội dung bằng thuật toán Readability…</string>
+    <string name="sending_to_ai">Đã trích xuất %d ký tự, đang gửi đến AI…</string>
+    <string name="summary_generated">Đã tạo tóm tắt (%d ký tự được phân tích)</string>
+    <string name="content_too_short">Nội dung quá ngắn để tóm tắt</string>
+    <string name="error_summarizing">Lỗi: %s</string>
+
+    <!-- Podcast Screen -->
+    <string name="podcast">🎙️ Podcast</string>
+    <string name="error_loading_podcast">Lỗi khi tải podcast</string>
+    <string name="podcast_no_audio">Podcast này không có âm thanh</string>
+    <string name="about_episode">Về tập này</string>
+
+    <!-- API Errors -->
+    <string name="api_key_required">Vui lòng đặt khóa API Gemini trong ContentSummarizer.kt\nLấy khóa miễn phí tại: https://aistudio.google.com/apikey</string>
+    <string name="invalid_api_key">Khóa API không hợp lệ. Lấy khóa miễn phí tại: https://aistudio.google.com/apikey</string>
+    <string name="api_quota_exceeded">Đã vượt quá hạn ngạch API. Hãy thử lại sau.</string>
+    <string name="rate_limit_reached">Đã đạt giới hạn. Vui lòng đợi một chút.</string>
+    <string name="model_not_available">Model không khả dụng. Hãy thử dùng model \'gemini-1.5-flash\'.</string>
+    <string name="content_too_large">Nội dung quá lớn hoặc lỗi API. Hãy thử với bài viết ngắn hơn.</string>
+    <string name="content_blocked">Nội dung bị chặn bởi bộ lọc an toàn.</string>
+</resources>

@@ -96,7 +96,7 @@ class PodcastDetailViewModel @Inject constructor(
         if (podcast.audioUrl.isNullOrBlank()) {
             Timber.e("Podcast has no audio URL: ${podcast.title}")
             _uiState.value = PodcastDetailUiState.Error(
-                errorMessage = "This podcast has no audio available"
+                errorMessage = context.getString(com.example.coccoc.R.string.podcast_no_audio)
             )
             return
         }
