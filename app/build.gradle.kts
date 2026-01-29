@@ -74,4 +74,14 @@ dependencies {
     implementation(libs.timber)
     implementation("com.google.ai.client.generativeai:generativeai:0.7.0")
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    implementation(libs.room.paging)
+    ksp(libs.room.compiler)
+
+    // Paging
+    implementation(libs.paging.runtime)
+    implementation(libs.paging.compose)
 }
